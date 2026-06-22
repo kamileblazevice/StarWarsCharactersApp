@@ -2,6 +2,10 @@
 
 An Android application that displays characters from the Star Wars universe, featuring offline-first support and detailed character information.
 
+## Demo
+
+![Demo](docs/demo.gif)
+
 ## Features
 
 - **Character List**: Browse a list of Star Wars characters fetched from the SWAPI (Star Wars API).
