@@ -12,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.starwarscharactersapp.R
 import com.example.starwarscharactersapp.data.local.ThemeMode
 import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
@@ -34,50 +34,38 @@ fun FavoriteListScreen(
     viewModel: FavoriteListViewModel = hiltViewModel(),
     onCharacterClicked: (String) -> Unit,
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val imageReloadRevision by viewModel.imageReloadRevision.collectAsStateWithLifecycle()
 
     FavoriteListContent(
         state = state,
+        imageReloadRevision = imageReloadRevision,
         onCharacterClicked = onCharacterClicked,
-        onEvent = { viewModel.onEvent(it) },
+        onEvent = viewModel::onEvent,
     )
 }
 
 @Composable
 fun FavoriteListContent(
     state: UiState<List<StarWarsCharacter>>,
+    imageReloadRevision: Int,
     onCharacterClicked: (String) -> Unit,
     onEvent: (FavoriteListEvent) -> Unit,
 ) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-    ) { padding ->
-        Box(
-            modifier = Modifier.fillMaxSize(),
-        ) {
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { _ ->
+        Box(modifier = Modifier.fillMaxSize()) {
             when (state) {
-                UiState.Loading -> {
-                    LoadingView()
-                }
-
-                is UiState.Error -> {
-                    // This state should not happen for favorites as it's local
-                }
-
-                is UiState.Success<List<StarWarsCharacter>> -> {
-                    val favorites = state.data
-                    if (favorites.isEmpty()) {
+                UiState.Loading -> LoadingView()
+                is UiState.Error -> { /* Favorites are local-only; errors cannot happen here */ }
+                is UiState.Success -> {
+                    if (state.data.isEmpty()) {
                         EmptyFavorites()
                     } else {
                         CharacterList(
-                            starWarsCharacters = favorites,
+                            starWarsCharacters = state.data,
+                            imageReloadRevision = imageReloadRevision,
                             onCharacterClicked = onCharacterClicked,
-                            onFavoriteToggled = { id ->
-                                onEvent(FavoriteListEvent.OnToggleFavorite(id))
-                            },
-                            onImageErrorChange = { id, error ->
-                                onEvent(FavoriteListEvent.OnImageErrorChange(id, error))
-                            },
+                            onFavoriteToggled = { id -> onEvent(FavoriteListEvent.OnToggleFavorite(id)) },
                         )
                     }
                 }
@@ -111,11 +99,7 @@ fun EmptyFavorites() {
 @Composable
 fun FavoriteListEmptyLightPreview() {
     StarWarsCharactersAppTheme(themeMode = ThemeMode.LIGHT) {
-        FavoriteListContent(
-            state = UiState.Success(emptyList()),
-            onCharacterClicked = {},
-            onEvent = {}
-        )
+        FavoriteListContent(state = UiState.Success(emptyList()), imageReloadRevision = 0, onCharacterClicked = {}, onEvent = {})
     }
 }
 
@@ -123,28 +107,20 @@ fun FavoriteListEmptyLightPreview() {
 @Composable
 fun FavoriteListEmptyDarkPreview() {
     StarWarsCharactersAppTheme(themeMode = ThemeMode.DARK) {
-        FavoriteListContent(
-            state = UiState.Success(emptyList()),
-            onCharacterClicked = {},
-            onEvent = {}
-        )
+        FavoriteListContent(state = UiState.Success(emptyList()), imageReloadRevision = 0, onCharacterClicked = {}, onEvent = {})
     }
 }
 
 @Preview(showBackground = true, name = "Populated State - Light")
 @Composable
 fun FavoriteListPopulatedLightPreview() {
-    StarWarsCharactersAppTheme(themeMode = ThemeMode.LIGHT) {
-        FavoriteListPopulatedPreviewContent()
-    }
+    StarWarsCharactersAppTheme(themeMode = ThemeMode.LIGHT) { FavoriteListPopulatedPreviewContent() }
 }
 
 @Preview(showBackground = true, name = "Populated State - Dark")
 @Composable
 fun FavoriteListPopulatedDarkPreview() {
-    StarWarsCharactersAppTheme(themeMode = ThemeMode.DARK) {
-        FavoriteListPopulatedPreviewContent()
-    }
+    StarWarsCharactersAppTheme(themeMode = ThemeMode.DARK) { FavoriteListPopulatedPreviewContent() }
 }
 
 @Composable
@@ -152,30 +128,13 @@ private fun FavoriteListPopulatedPreviewContent() {
     FavoriteListContent(
         state = UiState.Success(
             listOf(
-                StarWarsCharacter(
-                    id = "1",
-                    name = "Luke Skywalker",
-                    isFavorite = true,
-                    gender = "male",
-                    birthYear = "19BBY"
-                ),
-                StarWarsCharacter(
-                    id = "2",
-                    name = "C-3PO",
-                    isFavorite = true,
-                    gender = "n/a",
-                    birthYear = "112BBY"
-                ),
-                StarWarsCharacter(
-                    id = "3",
-                    name = "R2-D2",
-                    isFavorite = true,
-                    gender = "n/a",
-                    birthYear = "33BBY"
-                )
+                StarWarsCharacter(id = "1", name = "Luke Skywalker", isFavorite = true, gender = "male", birthYear = "19BBY"),
+                StarWarsCharacter(id = "2", name = "C-3PO", isFavorite = true, gender = "n/a", birthYear = "112BBY"),
+                StarWarsCharacter(id = "3", name = "R2-D2", isFavorite = true, gender = "n/a", birthYear = "33BBY"),
             )
         ),
+        imageReloadRevision = 0,
         onCharacterClicked = {},
-        onEvent = {}
+        onEvent = {},
     )
 }
