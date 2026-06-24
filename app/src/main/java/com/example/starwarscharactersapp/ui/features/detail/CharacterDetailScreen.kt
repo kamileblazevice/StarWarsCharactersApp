@@ -31,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +57,7 @@ import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
 import com.example.starwarscharactersapp.domain.model.Starship
 import com.example.starwarscharactersapp.domain.model.Vehicle
 import com.example.starwarscharactersapp.ui.features.detail.model.CharacterDetailEvent
+import com.example.starwarscharactersapp.ui.features.detail.model.CharacterDetailUiState
 import com.example.starwarscharactersapp.ui.helper.UiState
 import com.example.starwarscharactersapp.ui.shared.ErrorView
 import com.example.starwarscharactersapp.ui.shared.LoadingView
@@ -68,22 +68,15 @@ fun CharacterDetailScreen(
     viewModel: CharacterDetailViewModel,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val reloadKey by viewModel.reloadKey.collectAsState()
-
-    CharacterDetailContent(
-        state = state,
-        reloadKey = reloadKey,
-        onEvent = { viewModel.onEvent(it) },
-    )
+    CharacterDetailContent(state = state, onEvent = viewModel::onEvent)
 }
 
 @Composable
 fun CharacterDetailContent(
-    state: UiState<StarWarsCharacter>,
-    reloadKey: Int,
-    onEvent: (CharacterDetailEvent) -> Unit
+    state: UiState<CharacterDetailUiState>,
+    onEvent: (CharacterDetailEvent) -> Unit,
 ) {
-    val character = (state as? UiState.Success<StarWarsCharacter>)?.data
+    val character = (state as? UiState.Success)?.data?.character
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -118,25 +111,16 @@ fun CharacterDetailContent(
                 .padding(top = padding.calculateTopPadding()),
         ) {
             when (state) {
-                UiState.Loading -> {
-                    LoadingView()
-                }
-
-                is UiState.Error -> {
-                    ErrorView(
-                        onRetry = { onEvent(CharacterDetailEvent.OnReloadData) },
-                        modifier = Modifier.fillMaxSize(),
-                        icon = Icons.Default.PersonOff,
-                    )
-                }
-
-                is UiState.Success -> {
-                    CharacterDetails(
-                        character = state.data,
-                        reloadKey = reloadKey,
-                        onEvent = onEvent,
-                    )
-                }
+                UiState.Loading -> LoadingView()
+                is UiState.Error -> ErrorView(
+                    onRetry = { onEvent(CharacterDetailEvent.OnReloadData) },
+                    modifier = Modifier.fillMaxSize(),
+                    icon = Icons.Default.PersonOff,
+                )
+                is UiState.Success -> CharacterDetails(
+                    uiState = state.data,
+                    onEvent = onEvent,
+                )
             }
         }
     }
@@ -144,49 +128,19 @@ fun CharacterDetailContent(
 
 @Composable
 fun CharacterDetails(
-    character: StarWarsCharacter,
-    reloadKey: Int,
-    onEvent: (CharacterDetailEvent) -> Unit
+    uiState: CharacterDetailUiState,
+    onEvent: (CharacterDetailEvent) -> Unit,
 ) {
+    val character = uiState.character
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(dimensionResource(R.dimen.margin_medium)),
         verticalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.margin_medium)),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        var isPlaceholder by remember { mutableStateOf(true) }
-
-        ElevatedCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp),
-            shape = RoundedCornerShape(dimensionResource(R.dimen.margin_medium)),
-        ) {
-            key(reloadKey) {
-                AsyncImage(
-                    model = character.imageUrl,
-                    contentDescription = character.name,
-                    placeholder = rememberVectorPainter(Icons.Default.Person),
-                    error = rememberVectorPainter(Icons.Default.Person),
-                    onLoading = {
-                        isPlaceholder = true
-                    },
-                    onSuccess = {
-                        isPlaceholder = false
-                    },
-                    onError = {
-                        isPlaceholder = true
-                        onEvent(CharacterDetailEvent.OnImageError(error = it.result.throwable.message))
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    colorFilter = if (isPlaceholder) ColorFilter.tint(Color.Gray) else null,
-                )
-            }
-        }
-
+        CharacterImage(imageUrl = character.imageUrl, name = character.name, reloadKey = uiState.imageReloadKey)
 
         if (character.description.isNotEmpty()) {
             InfoSection(title = stringResource(R.string.character_detail_screen_description_title)) {
@@ -199,84 +153,60 @@ fun CharacterDetails(
         }
 
         InfoSection(title = stringResource(R.string.character_detail_screen_general_info_title)) {
-            DetailItem(
-                stringResource(
-                    R.string.character_detail_screen_birth_year,
-                    character.birthYear,
-                ),
-            )
+            DetailItem(stringResource(R.string.character_detail_screen_birth_year, character.birthYear))
             DetailItem(stringResource(R.string.character_detail_screen_gender, character.gender))
             DetailItem(stringResource(R.string.character_detail_screen_height, character.height))
             DetailItem(stringResource(R.string.character_detail_screen_mass, character.mass))
         }
 
         InfoSection(title = stringResource(R.string.character_detail_screen_physical_traits_title)) {
-            DetailItem(
-                stringResource(
-                    R.string.character_detail_screen_eye_colour,
-                    character.eyeColor,
-                ),
-            )
-            DetailItem(
-                stringResource(
-                    R.string.character_detail_screen_hair_colour,
-                    character.hairColor,
-                ),
-            )
-            DetailItem(
-                stringResource(
-                    R.string.character_detail_screen_skin_colour,
-                    character.skinColor,
-                ),
-            )
+            DetailItem(stringResource(R.string.character_detail_screen_eye_colour, character.eyeColor))
+            DetailItem(stringResource(R.string.character_detail_screen_hair_colour, character.hairColor))
+            DetailItem(stringResource(R.string.character_detail_screen_skin_colour, character.skinColor))
         }
 
-        if (character.planetError != null) {
-            SectionErrorView(
-                title = stringResource(R.string.character_detail_screen_planet_title),
-                onRetry = { onEvent(CharacterDetailEvent.OnRetryPlanet) },
-                icon = Icons.Default.Place
-            )
-        } else if (character.planet != null) {
-            PlanetSection(planet = character.planet)
-        } else {
-            SectionLoadingIndicator(stringResource(R.string.character_detail_screen_planet_title))
+        SectionWithState(
+            title = stringResource(R.string.character_detail_screen_planet_title),
+            hasUrls = character.homeworld.isNotEmpty(),
+            hasData = character.planet != null,
+            hasError = uiState.planetError,
+            onRetry = { onEvent(CharacterDetailEvent.OnRetryPlanet) },
+            errorIcon = Icons.Default.Place,
+        ) {
+            PlanetSection(planet = character.planet!!)
         }
 
-        if (character.filmsError != null) {
-            SectionErrorView(
-                title = stringResource(R.string.character_detail_screen_films_title),
-                onRetry = { onEvent(CharacterDetailEvent.OnRetryFilms) },
-                icon = Icons.Default.Movie
-            )
-        } else if (character.films.isNotEmpty()) {
+        SectionWithState(
+            title = stringResource(R.string.character_detail_screen_films_title),
+            hasUrls = character.filmUrls.isNotEmpty(),
+            hasData = character.films.isNotEmpty(),
+            hasError = uiState.filmsError,
+            onRetry = { onEvent(CharacterDetailEvent.OnRetryFilms) },
+            errorIcon = Icons.Default.Movie,
+        ) {
             FilmSection(films = character.films)
-        } else {
-            SectionLoadingIndicator(stringResource(R.string.character_detail_screen_films_title))
         }
 
-        if (character.starshipsError != null) {
-            SectionErrorView(
-                title = stringResource(R.string.character_detail_screen_starships_title),
-                onRetry = { onEvent(CharacterDetailEvent.OnRetryStarships) },
-                icon = Icons.Default.RocketLaunch
-            )
-        } else if (character.starships.isNotEmpty()) {
+        SectionWithState(
+            title = stringResource(R.string.character_detail_screen_starships_title),
+            hasUrls = character.starshipUrls.isNotEmpty(),
+            hasData = character.starships.isNotEmpty(),
+            hasError = uiState.starshipsError,
+            onRetry = { onEvent(CharacterDetailEvent.OnRetryStarships) },
+            errorIcon = Icons.Default.RocketLaunch,
+        ) {
             StarshipSection(starships = character.starships)
-        } else if (character.starshipUrls.isNotEmpty()) {
-            SectionLoadingIndicator(stringResource(R.string.character_detail_screen_starships_title))
         }
 
-        if (character.vehiclesError != null) {
-            SectionErrorView(
-                title = stringResource(R.string.character_detail_screen_vehicles_title),
-                onRetry = { onEvent(CharacterDetailEvent.OnRetryVehicles) },
-                icon = Icons.Default.FireTruck
-            )
-        } else if (character.vehicles.isNotEmpty()) {
+        SectionWithState(
+            title = stringResource(R.string.character_detail_screen_vehicles_title),
+            hasUrls = character.vehicleUrls.isNotEmpty(),
+            hasData = character.vehicles.isNotEmpty(),
+            hasError = uiState.vehiclesError,
+            onRetry = { onEvent(CharacterDetailEvent.OnRetryVehicles) },
+            errorIcon = Icons.Default.FireTruck,
+        ) {
             VehicleSection(vehicles = character.vehicles)
-        } else if (character.vehicleUrls.isNotEmpty()) {
-            SectionLoadingIndicator(stringResource(R.string.character_detail_screen_vehicles_title))
         }
 
         Spacer(modifier = Modifier.height(dimensionResource(R.dimen.margin_medium)))
@@ -284,26 +214,67 @@ fun CharacterDetails(
 }
 
 @Composable
+private fun CharacterImage(imageUrl: String?, name: String, reloadKey: Int) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(300.dp),
+        shape = RoundedCornerShape(dimensionResource(R.dimen.margin_medium)),
+    ) {
+        var isPlaceholder by remember { mutableStateOf(true) }
+        key(reloadKey) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = name,
+                placeholder = rememberVectorPainter(Icons.Default.Person),
+                error = rememberVectorPainter(Icons.Default.Person),
+                onLoading = { isPlaceholder = true },
+                onSuccess = { isPlaceholder = false },
+                onError = { isPlaceholder = true },
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                colorFilter = if (isPlaceholder) ColorFilter.tint(Color.Gray) else null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionWithState(
+    title: String,
+    hasUrls: Boolean,
+    hasData: Boolean,
+    hasError: Boolean,
+    onRetry: () -> Unit,
+    errorIcon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.Warning,
+    content: @Composable () -> Unit,
+) {
+    when {
+        hasError -> SectionErrorView(title = title, onRetry = onRetry, icon = errorIcon)
+        hasData -> content()
+        hasUrls -> SectionLoadingIndicator(title = title)
+    }
+}
+
+@Composable
 fun InfoSection(
     title: String,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.elevatedCardColors(
-            contentColor = MaterialTheme.colorScheme.onSurface
-        )
+        colors = CardDefaults.elevatedCardColors(contentColor = MaterialTheme.colorScheme.onSurface),
     ) {
         Column(
             modifier = Modifier.padding(dimensionResource(R.dimen.margin_medium)),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
             content()
@@ -317,7 +288,7 @@ fun DetailItem(text: String) {
         text = text,
         style = MaterialTheme.typography.bodyLarge,
         modifier = Modifier.padding(vertical = 2.dp),
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
     )
 }
 
@@ -327,19 +298,9 @@ fun PlanetSection(planet: Planet) {
         DetailItem(stringResource(R.string.character_detail_screen_planet_name, planet.name))
         DetailItem(stringResource(R.string.character_detail_screen_planet_climate, planet.climate))
         DetailItem(stringResource(R.string.character_detail_screen_planet_terrain, planet.terrain))
-        DetailItem(
-            stringResource(
-                R.string.character_detail_screen_planet_population,
-                planet.population
-            )
-        )
+        DetailItem(stringResource(R.string.character_detail_screen_planet_population, planet.population))
         DetailItem(stringResource(R.string.character_detail_screen_planet_gravity, planet.gravity))
-        DetailItem(
-            stringResource(
-                R.string.character_detail_screen_planet_diameter,
-                planet.diameter
-            )
-        )
+        DetailItem(stringResource(R.string.character_detail_screen_planet_diameter, planet.diameter))
     }
 }
 
@@ -350,10 +311,7 @@ fun FilmSection(films: List<Film>) {
             DetailItem(
                 stringResource(
                     R.string.character_detail_screen_film_title,
-                    index + 1,
-                    film.title,
-                    film.releaseYear,
-                    film.director,
+                    index + 1, film.title, film.releaseYear, film.director,
                 )
             )
         }
@@ -364,13 +322,7 @@ fun FilmSection(films: List<Film>) {
 fun StarshipSection(starships: List<Starship>) {
     InfoSection(title = stringResource(R.string.character_detail_screen_starships_title)) {
         starships.forEachIndexed { index, starship ->
-            DetailItem(
-                stringResource(
-                    R.string.character_detail_screen_starship_name,
-                    index + 1,
-                    starship.name
-                )
-            )
+            DetailItem(stringResource(R.string.character_detail_screen_starship_name, index + 1, starship.name))
         }
     }
 }
@@ -379,13 +331,7 @@ fun StarshipSection(starships: List<Starship>) {
 fun VehicleSection(vehicles: List<Vehicle>) {
     InfoSection(title = stringResource(R.string.character_detail_screen_vehicles_title)) {
         vehicles.forEachIndexed { index, vehicle ->
-            DetailItem(
-                stringResource(
-                    R.string.character_detail_screen_vehicle_name,
-                    index + 1,
-                    vehicle.name
-                )
-            )
+            DetailItem(stringResource(R.string.character_detail_screen_vehicle_name, index + 1, vehicle.name))
         }
     }
 }
@@ -394,31 +340,29 @@ fun VehicleSection(vehicles: List<Vehicle>) {
 fun SectionErrorView(
     title: String,
     onRetry: () -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.Warning
+    icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Default.Warning,
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.elevatedCardColors(
-            contentColor = MaterialTheme.colorScheme.onSurface
-        )
+        colors = CardDefaults.elevatedCardColors(contentColor = MaterialTheme.colorScheme.onSurface),
     ) {
         Column(
             modifier = Modifier.padding(dimensionResource(R.dimen.margin_medium)),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(dimensionResource(R.dimen.margin_medium)),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 ErrorView(onRetry = onRetry, icon = icon)
             }
@@ -431,25 +375,23 @@ fun SectionLoadingIndicator(title: String) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.elevatedCardColors(
-            contentColor = MaterialTheme.colorScheme.onSurface
-        )
+        colors = CardDefaults.elevatedCardColors(contentColor = MaterialTheme.colorScheme.onSurface),
     ) {
         Column(
             modifier = Modifier.padding(dimensionResource(R.dimen.margin_medium)),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(dimensionResource(R.dimen.margin_medium))
+                    .padding(dimensionResource(R.dimen.margin_medium)),
             ) {
                 LoadingView()
             }
@@ -477,46 +419,47 @@ private fun CharacterDetailDarkPreview() {
 private fun CharacterDetailPreviewContent() {
     CharacterDetailContent(
         state = UiState.Success(
-            StarWarsCharacter(
-                id = "1",
-                name = "Luke Skywalker",
-                birthYear = "19BBY",
-                eyeColor = "blue",
-                skinColor = "fair",
-                gender = "male",
-                hairColor = "blond",
-                height = "172",
-                mass = "77",
-                description = "Luke Skywalker, a Force-sensitive human male, was a legendary Jedi Master who fought in the Galactic Civil War during the reign of the Galactic Empire.",
-                imageUrl = "https://starwars-visualguide.com/assets/img/characters/1.jpg",
-                isFavorite = true,
-                planet = Planet(
-                    name = "Tatooine",
-                    climate = "arid",
-                    terrain = "desert",
-                    population = "200000",
-                    gravity = "1 standard",
-                    diameter = "10465"
-                ),
-                films = listOf(
-                    Film(title = "A New Hope", releaseYear = "1977", director = "George Lucas"),
-                    Film(
-                        title = "The Empire Strikes Back",
-                        releaseYear = "1980",
-                        director = "Irvin Kershner"
-                    )
-                ),
-                starships = listOf(
-                    Starship(name = "X-wing"),
-                    Starship(name = "Imperial shuttle")
-                ),
-                vehicles = listOf(
-                    Vehicle(name = "Snowspeeder"),
-                    Vehicle(name = "Imperial Speeder Bike")
+            CharacterDetailUiState(
+                character = StarWarsCharacter(
+                    id = "1",
+                    name = "Luke Skywalker",
+                    birthYear = "19BBY",
+                    eyeColor = "blue",
+                    skinColor = "fair",
+                    gender = "male",
+                    hairColor = "blond",
+                    height = "172",
+                    mass = "77",
+                    description = "Luke Skywalker, a Force-sensitive human male, was a legendary Jedi Master who fought in the Galactic Civil War during the reign of the Galactic Empire.",
+                    imageUrl = "https://starwars-visualguide.com/assets/img/characters/1.jpg",
+                    isFavorite = true,
+                    planet = Planet(
+                        name = "Tatooine",
+                        climate = "arid",
+                        terrain = "desert",
+                        population = "200000",
+                        gravity = "1 standard",
+                        diameter = "10465",
+                    ),
+                    films = listOf(
+                        Film(title = "A New Hope", releaseYear = "1977", director = "George Lucas"),
+                        Film(
+                            title = "The Empire Strikes Back",
+                            releaseYear = "1980",
+                            director = "Irvin Kershner"
+                        ),
+                    ),
+                    starships = listOf(
+                        Starship(name = "X-wing"),
+                        Starship(name = "Imperial shuttle")
+                    ),
+                    vehicles = listOf(
+                        Vehicle(name = "Snowspeeder"),
+                        Vehicle(name = "Imperial Speeder Bike")
+                    ),
                 )
             )
         ),
-        reloadKey = 0,
-        onEvent = {}
+        onEvent = {},
     )
 }

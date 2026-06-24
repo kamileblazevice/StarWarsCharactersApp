@@ -35,7 +35,7 @@ class CharacterDetailViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        every { networkMonitor.isOnline } returns flowOf(true)
+        every { networkMonitor.isOnline } returns flowOf(false)
         every { repository.getCharacterFlow(any()) } returns flowOf(null)
     }
 
@@ -49,7 +49,7 @@ class CharacterDetailViewModelTest {
         // Arrange
         val character = StarWarsCharacter(id = characterId, name = "Luke Skywalker")
         coEvery { repository.getCharacter(characterId) } returns ApiResult.Success(character)
-        
+
         // Act
         viewModel = CharacterDetailViewModel(repository, networkMonitor, characterId)
 
@@ -58,7 +58,23 @@ class CharacterDetailViewModelTest {
             assertEquals(UiState.Loading, awaitItem())
             val state = awaitItem()
             assertTrue(state is UiState.Success)
-            assertEquals("Luke Skywalker", (state as UiState.Success).data.name)
+            assertEquals("Luke Skywalker", (state as UiState.Success).data.character.name)
+        }
+    }
+
+    @Test
+    fun `state is Error when API fails and no local data`() = runTest {
+        // Arrange
+        coEvery { repository.getCharacter(characterId) } returns ApiResult.Error("Network error")
+
+        // Act
+        viewModel = CharacterDetailViewModel(repository, networkMonitor, characterId)
+
+        // Assert
+        viewModel.state.test {
+            assertEquals(UiState.Loading, awaitItem())
+            val state = awaitItem()
+            assertTrue(state is UiState.Error)
         }
     }
 }

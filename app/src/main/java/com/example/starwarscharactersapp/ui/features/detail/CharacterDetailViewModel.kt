@@ -4,8 +4,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.starwarscharactersapp.data.helper.ApiResult
 import com.example.starwarscharactersapp.data.helper.NetworkMonitor
 import com.example.starwarscharactersapp.data.repository.StarWarsRepository
-import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
 import com.example.starwarscharactersapp.ui.features.detail.model.CharacterDetailEvent
+import com.example.starwarscharactersapp.ui.features.detail.model.CharacterDetailUiState
 import com.example.starwarscharactersapp.ui.helper.BaseViewModel
 import com.example.starwarscharactersapp.ui.helper.UiState
 import dagger.assisted.Assisted
@@ -14,9 +14,9 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -32,96 +32,39 @@ class CharacterDetailViewModel @AssistedInject constructor(
         fun create(characterId: String): CharacterDetailViewModel
     }
 
-    private val _state = MutableStateFlow<UiState<StarWarsCharacter>>(UiState.Loading)
+    private val _state = MutableStateFlow<UiState<CharacterDetailUiState>>(UiState.Loading)
     val state = _state.asStateFlow()
 
-    private val _reloadKey = MutableStateFlow(0)
-    val reloadKey = _reloadKey.asStateFlow()
-
     init {
+        loadCharacter()
         observeCharacter()
-        getCharacterDetail()
         observeNetwork()
     }
 
-    private fun observeCharacter() {
-        viewModelScope.launch {
-            repository.getCharacterFlow(characterId).collect { character ->
-                character?.let { char ->
-                    _state.update { currentState ->
-                        if (currentState is UiState.Success) {
-                            UiState.Success(
-                                currentState.data.copy(
-                                    isFavorite = char.isFavorite,
-                                )
-                            )
-                        } else {
-                            currentState
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-
-    fun getCharacterDetail() {
+    private fun loadCharacter() {
         viewModelScope.launch {
             _state.value = UiState.Loading
             when (val result = repository.getCharacter(characterId)) {
                 is ApiResult.Success -> {
                     val character = result.data
-                    _state.value = UiState.Success(character)
-                    if (character.homeworld.isNotEmpty()) {
-                        getPlanet(character.homeworld)
-                    }
-                    if (character.filmUrls.isNotEmpty()) {
-                        getFilms(character.filmUrls)
-                    }
-                    if (character.starshipUrls.isNotEmpty()) {
-                        getStarships(character.starshipUrls)
-                    }
-                    if (character.vehicleUrls.isNotEmpty()) {
-                        getVehicles(character.vehicleUrls)
-                    }
+                    _state.value = UiState.Success(CharacterDetailUiState(character = character))
+                    if (character.homeworld.isNotEmpty()) loadPlanet(character.homeworld)
+                    if (character.filmUrls.isNotEmpty()) loadFilms(character.filmUrls)
+                    if (character.starshipUrls.isNotEmpty()) loadStarships(character.starshipUrls)
+                    if (character.vehicleUrls.isNotEmpty()) loadVehicles(character.vehicleUrls)
                 }
-
-                is ApiResult.Error -> {
-                    _state.value = UiState.Error(result.message)
-                }
+                is ApiResult.Error -> _state.value = UiState.Error(result.message)
             }
         }
     }
 
-    fun getPlanet(url: String) {
-        val id = url.filter { it.isDigit() }
+    private fun observeCharacter() {
         viewModelScope.launch {
-            _state.update { currentState ->
-                if (currentState is UiState.Success) {
-                    UiState.Success(currentState.data.copy(planetError = null))
-                } else currentState
-            }
-
-            when (val result = repository.getPlanet(id)) {
-                is ApiResult.Success -> {
+            repository.getCharacterFlow(characterId).collect { character ->
+                character?.let {
                     _state.update { currentState ->
                         if (currentState is UiState.Success) {
-                            UiState.Success(
-                                currentState.data.copy(
-                                    planet = result.data, planetError = null
-                                )
-                            )
-                        } else {
-                            currentState
-                        }
-                    }
-                }
-
-                is ApiResult.Error -> {
-                    delay(1000)
-                    _state.update { currentState ->
-                        if (currentState is UiState.Success) {
-                            UiState.Success(currentState.data.copy(planetError = result.message))
+                            UiState.Success(currentState.data.copy(character = currentState.data.character.copy(isFavorite = it.isFavorite)))
                         } else currentState
                     }
                 }
@@ -129,190 +72,122 @@ class CharacterDetailViewModel @AssistedInject constructor(
         }
     }
 
-    fun getFilms(filmUrls: List<String>) {
-        viewModelScope.launch {
-            _state.update { currentState ->
-                if (currentState is UiState.Success) {
-                    UiState.Success(currentState.data.copy(filmsError = null))
-                } else currentState
-            }
-
-            val results = filmUrls.map { url ->
-                val id = url.filter { it.isDigit() }
-                async { repository.getFilm(id) }
-            }.awaitAll()
-
-            val fetchedFilms = results.mapNotNull { (it as? ApiResult.Success)?.data }
-            val firstError = results.filterIsInstance<ApiResult.Error>().firstOrNull()
-            delay(1000)
-
-            _state.update { currentState ->
-                if (currentState is UiState.Success) {
-                    UiState.Success(
-                        currentState.data.copy(
-                            films = fetchedFilms, filmsError = firstError?.message
-                        )
-                    )
-                } else currentState
-            }
-        }
-    }
-
-    fun getStarships(starshipUrls: List<String>) {
-        viewModelScope.launch {
-            _state.update { currentState ->
-                if (currentState is UiState.Success) {
-                    UiState.Success(currentState.data.copy(starshipsError = null))
-                } else currentState
-            }
-
-            val results = starshipUrls.map { url ->
-                val id = url.filter { it.isDigit() }
-                async { repository.getStarship(id) }
-            }.awaitAll()
-            delay(1000)
-
-            val fetchedStarships = results.mapNotNull { (it as? ApiResult.Success)?.data }
-            val firstError = results.filterIsInstance<ApiResult.Error>().firstOrNull()
-
-            _state.update { currentState ->
-                if (currentState is UiState.Success) {
-                    UiState.Success(
-                        currentState.data.copy(
-                            starships = fetchedStarships, starshipsError = firstError?.message
-                        )
-                    )
-                } else currentState
-            }
-        }
-    }
-
-    fun getVehicles(vehicleUrls: List<String>) {
-        viewModelScope.launch {
-            _state.update { currentState ->
-                if (currentState is UiState.Success) {
-                    UiState.Success(currentState.data.copy(vehiclesError = null))
-                } else currentState
-            }
-
-            val results = vehicleUrls.map { url ->
-                val id = url.filter { it.isDigit() }
-                async { repository.getVehicle(id) }
-            }.awaitAll()
-            delay(1000)
-
-            val fetchedVehicles = results.mapNotNull { (it as? ApiResult.Success)?.data }
-            val firstError = results.filterIsInstance<ApiResult.Error>().firstOrNull()
-
-            _state.update { currentState ->
-                if (currentState is UiState.Success) {
-                    UiState.Success(
-                        currentState.data.copy(
-                            vehicles = fetchedVehicles, vehiclesError = firstError?.message
-                        )
-                    )
-                } else currentState
-            }
-        }
-    }
-
     private fun observeNetwork() {
         viewModelScope.launch {
-            networkMonitor.isOnline.collect { isOnline ->
-                if (isOnline) {
-                    retryAllFailed()
-                }
-            }
+            networkMonitor.isOnline.filter { it }.collect { retryAllFailed() }
         }
     }
 
     private fun retryAllFailed() {
         val currentState = _state.value
         if (currentState is UiState.Error) {
-            getCharacterDetail()
-        } else if (currentState is UiState.Success) {
-            val character = (_state.value as? UiState.Success)?.data ?: return
-            if (character.imageUrl?.isNotEmpty() == true) {
-                refreshImage()
-            } else {
-                viewModelScope.launch {
-                    when (val result = repository.getCharacter(characterId)) {
-                        is ApiResult.Success -> {
-                            val character = result.data
-                            _state.update { currentState ->
-                                if (currentState is UiState.Success) {
-                                    UiState.Success(currentState.data.copy(imageUrl = character.imageUrl))
-                                } else currentState
-                            }
-                            refreshImage()
-                        }
+            loadCharacter()
+            return
+        }
+        if (currentState !is UiState.Success) return
+        val uiState = currentState.data
+        _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(imageReloadKey = it.data.imageReloadKey + 1)) else it }
+        if (uiState.planetError) loadPlanet(uiState.character.homeworld)
+        if (uiState.filmsError) loadFilms(uiState.character.filmUrls)
+        if (uiState.starshipsError) loadStarships(uiState.character.starshipUrls)
+        if (uiState.vehiclesError) loadVehicles(uiState.character.vehicleUrls)
+    }
 
-                        else -> {}
-                    }
+    private fun loadPlanet(url: String) {
+        val id = url.filter { it.isDigit() }
+        viewModelScope.launch {
+            _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(planetError = false)) else it }
+            when (val result = repository.getPlanet(id)) {
+                is ApiResult.Success -> _state.update { currentState ->
+                    if (currentState is UiState.Success) {
+                        UiState.Success(currentState.data.copy(character = currentState.data.character.copy(planet = result.data)))
+                    } else currentState
                 }
-            }
-            if (character.planetError != null) {
-                getPlanet(character.homeworld)
-            }
-            if (character.filmsError != null) {
-                getFilms(character.filmUrls)
-            }
-            if (character.starshipsError != null) {
-                getStarships(character.starshipUrls)
-            }
-            if (character.vehiclesError != null) {
-                getVehicles(character.vehicleUrls)
+                is ApiResult.Error -> _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(planetError = true)) else it }
             }
         }
     }
 
-    fun refreshImage() {
-        _reloadKey.update { it + 1 }
+    private fun loadFilms(filmUrls: List<String>) {
+        viewModelScope.launch {
+            _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(filmsError = false)) else it }
+            val results = filmUrls.map { url ->
+                async { repository.getFilm(url.filter { c -> c.isDigit() }) }
+            }.awaitAll()
+            val fetchedFilms = results.mapNotNull { (it as? ApiResult.Success)?.data }
+            val hasError = results.any { it is ApiResult.Error }
+            _state.update { currentState ->
+                if (currentState is UiState.Success) {
+                    UiState.Success(
+                        currentState.data.copy(
+                            character = currentState.data.character.copy(films = fetchedFilms),
+                            filmsError = hasError && fetchedFilms.isEmpty(),
+                        )
+                    )
+                } else currentState
+            }
+        }
     }
 
+    private fun loadStarships(starshipUrls: List<String>) {
+        viewModelScope.launch {
+            _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(starshipsError = false)) else it }
+            val results = starshipUrls.map { url ->
+                async { repository.getStarship(url.filter { c -> c.isDigit() }) }
+            }.awaitAll()
+            val fetchedStarships = results.mapNotNull { (it as? ApiResult.Success)?.data }
+            val hasError = results.any { it is ApiResult.Error }
+            _state.update { currentState ->
+                if (currentState is UiState.Success) {
+                    UiState.Success(
+                        currentState.data.copy(
+                            character = currentState.data.character.copy(starships = fetchedStarships),
+                            starshipsError = hasError && fetchedStarships.isEmpty(),
+                        )
+                    )
+                } else currentState
+            }
+        }
+    }
+
+    private fun loadVehicles(vehicleUrls: List<String>) {
+        viewModelScope.launch {
+            _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(vehiclesError = false)) else it }
+            val results = vehicleUrls.map { url ->
+                async { repository.getVehicle(url.filter { c -> c.isDigit() }) }
+            }.awaitAll()
+            val fetchedVehicles = results.mapNotNull { (it as? ApiResult.Success)?.data }
+            val hasError = results.any { it is ApiResult.Error }
+            _state.update { currentState ->
+                if (currentState is UiState.Success) {
+                    UiState.Success(
+                        currentState.data.copy(
+                            character = currentState.data.character.copy(vehicles = fetchedVehicles),
+                            vehiclesError = hasError && fetchedVehicles.isEmpty(),
+                        )
+                    )
+                } else currentState
+            }
+        }
+    }
 
     override fun onEvent(event: CharacterDetailEvent) {
         when (event) {
-            is CharacterDetailEvent.OnReloadData -> {
-                getCharacterDetail()
+            CharacterDetailEvent.OnReloadData -> loadCharacter()
+            CharacterDetailEvent.OnToggleFavorite -> viewModelScope.launch {
+                repository.toggleFavorite(characterId)
             }
-
-            CharacterDetailEvent.OnToggleFavorite -> {
-                viewModelScope.launch {
-                    repository.toggleFavorite(characterId)
-                }
+            CharacterDetailEvent.OnRetryPlanet -> (_state.value as? UiState.Success)?.data?.let {
+                loadPlanet(it.character.homeworld)
             }
-
-            CharacterDetailEvent.OnRetryFilms -> {
-                (_state.value as? UiState.Success)?.data?.let { character ->
-                    getFilms(character.filmUrls)
-                }
+            CharacterDetailEvent.OnRetryFilms -> (_state.value as? UiState.Success)?.data?.let {
+                loadFilms(it.character.filmUrls)
             }
-
-            CharacterDetailEvent.OnRetryPlanet -> {
-                (_state.value as? UiState.Success)?.data?.let { character ->
-                    getPlanet(character.homeworld)
-                }
+            CharacterDetailEvent.OnRetryStarships -> (_state.value as? UiState.Success)?.data?.let {
+                loadStarships(it.character.starshipUrls)
             }
-
-            CharacterDetailEvent.OnRetryStarships -> {
-                (_state.value as? UiState.Success)?.data?.let { character ->
-                    getStarships(character.starshipUrls)
-                }
-            }
-
-            CharacterDetailEvent.OnRetryVehicles -> {
-                (_state.value as? UiState.Success)?.data?.let { character ->
-                    getVehicles(character.vehicleUrls)
-                }
-            }
-
-            is CharacterDetailEvent.OnImageError -> {
-                _state.update { currentState ->
-                    if (currentState is UiState.Success) {
-                        UiState.Success(currentState.data.copy(imageError = event.error))
-                    } else currentState
-                }
+            CharacterDetailEvent.OnRetryVehicles -> (_state.value as? UiState.Success)?.data?.let {
+                loadVehicles(it.character.vehicleUrls)
             }
         }
     }
