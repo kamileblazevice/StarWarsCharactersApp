@@ -174,21 +174,33 @@ class CharacterDetailViewModel @AssistedInject constructor(
     override fun onEvent(event: CharacterDetailEvent) {
         when (event) {
             CharacterDetailEvent.OnReloadData -> loadCharacter()
-            CharacterDetailEvent.OnToggleFavorite -> viewModelScope.launch {
-                repository.toggleFavorite(characterId)
-            }
-            CharacterDetailEvent.OnRetryPlanet -> (_state.value as? UiState.Success)?.data?.let {
-                loadPlanet(it.character.homeworld)
-            }
-            CharacterDetailEvent.OnRetryFilms -> (_state.value as? UiState.Success)?.data?.let {
-                loadFilms(it.character.filmUrls)
-            }
-            CharacterDetailEvent.OnRetryStarships -> (_state.value as? UiState.Success)?.data?.let {
-                loadStarships(it.character.starshipUrls)
-            }
-            CharacterDetailEvent.OnRetryVehicles -> (_state.value as? UiState.Success)?.data?.let {
-                loadVehicles(it.character.vehicleUrls)
-            }
+            CharacterDetailEvent.OnToggleFavorite -> toggleFavorite()
+            CharacterDetailEvent.OnRetryPlanet -> retryPlanet()
+            CharacterDetailEvent.OnRetryFilms -> retryFilms()
+            CharacterDetailEvent.OnRetryStarships -> retryStarships()
+            CharacterDetailEvent.OnRetryVehicles -> retryVehicles()
         }
+    }
+
+    private fun toggleFavorite() {
+        viewModelScope.launch {
+            repository.toggleFavorite(characterId)
+        }
+    }
+
+    private fun retryPlanet() {
+        (_state.value as? UiState.Success)?.data?.let { loadPlanet(it.character.homeworld) }
+    }
+
+    private fun retryFilms() {
+        (_state.value as? UiState.Success)?.data?.let { loadFilms(it.character.filmUrls) }
+    }
+
+    private fun retryStarships() {
+        (_state.value as? UiState.Success)?.data?.let { loadStarships(it.character.starshipUrls) }
+    }
+
+    private fun retryVehicles() {
+        (_state.value as? UiState.Success)?.data?.let { loadVehicles(it.character.vehicleUrls) }
     }
 }
