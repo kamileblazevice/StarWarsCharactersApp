@@ -222,15 +222,22 @@ private fun CharacterImage(imageUrl: String?, name: String, reloadKey: Int) {
         shape = RoundedCornerShape(dimensionResource(R.dimen.margin_medium)),
     ) {
         var isPlaceholder by remember { mutableStateOf(true) }
-        key(reloadKey) {
+        var hadError by remember { mutableStateOf(false) }
+        key(if (hadError && !imageUrl.isNullOrEmpty()) reloadKey else Unit) {
             AsyncImage(
                 model = imageUrl,
                 contentDescription = name,
                 placeholder = rememberVectorPainter(Icons.Default.Person),
                 error = rememberVectorPainter(Icons.Default.Person),
                 onLoading = { isPlaceholder = true },
-                onSuccess = { isPlaceholder = false },
-                onError = { isPlaceholder = true },
+                onSuccess = {
+                    hadError = false
+                    isPlaceholder = false
+                            },
+                onError = {
+                    hadError = true
+                    isPlaceholder = true
+                          },
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
                 colorFilter = if (isPlaceholder) ColorFilter.tint(Color.Gray) else null,
