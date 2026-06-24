@@ -40,33 +40,35 @@ class StarWarsRepository @Inject constructor(
     private val dao: StarWarsDao,
 ) {
     suspend fun getCharacters(): ApiResult<List<StarWarsCharacter>> = coroutineScope {
-        val result = safeApiCall {
-            api.getCharacters()
-        }
+        val result = safeApiCall { api.getCharacters() }
         when (result) {
             is ApiResult.Success -> {
-                val swCharacters = result.data
-                val charactersWithInfo = swCharacters.map { dto ->
+                val localCharacters = dao.getCharacters().first()
+                val cachedById = localCharacters.associateBy { it.id }
+
+                val enrichedDtos = result.data.map { dto ->
                     async {
-                        getCharacterPhotoAndDescription(dto)
+                        val cached = cachedById[dto.id]
+                        if (cached?.imageUrl != null) {
+                            dto.copy(imageUrl = cached.imageUrl, description = cached.description)
+                        } else {
+                            enrichWithDatabankInfo(dto)
+                        }
                     }
                 }.awaitAll()
 
-                val localCharacters = dao.getCharacters().first()
                 val favoriteIds = localCharacters.filter { it.isFavorite }.map { it.id }.toSet()
-
-                val charactersToInsert = charactersWithInfo.map { dto ->
+                val entitiesToInsert = enrichedDtos.map { dto ->
                     dto.copy(isFavorite = favoriteIds.contains(dto.id)).toCharacterEntity()
                 }
-                dao.insertCharacters(charactersToInsert)
-
-                ApiResult.Success(charactersToInsert.map { it.toStarWarsCharacter() })
+                dao.insertCharacters(entitiesToInsert)
+                ApiResult.Success(entitiesToInsert.map { it.toStarWarsCharacter() })
             }
 
             is ApiResult.Error -> {
                 val localCharacters = dao.getCharacters().first()
                 if (localCharacters.isNotEmpty()) {
-                    ApiResult.Success(localCharacters.map { entity -> entity.toStarWarsCharacter() })
+                    ApiResult.Success(localCharacters.map { it.toStarWarsCharacter() })
                 } else {
                     result
                 }
@@ -75,15 +77,16 @@ class StarWarsRepository @Inject constructor(
     }
 
     suspend fun getCharacter(id: String): ApiResult<StarWarsCharacter> {
-        val result = safeApiCall {
-            api.getCharacter(id)
-        }
+        val result = safeApiCall { api.getCharacter(id) }
         return when (result) {
             is ApiResult.Success -> {
-                val dtoWithInfo = getCharacterPhotoAndDescription(result.data)
                 val local = dao.getCharacterById(id)
-                val isFavorite = local?.isFavorite ?: false
-                val charToInsert = dtoWithInfo.copy(isFavorite = isFavorite).toCharacterEntity()
+                val dto = if (local?.imageUrl != null) {
+                    result.data.copy(imageUrl = local.imageUrl, description = local.description)
+                } else {
+                    enrichWithDatabankInfo(result.data)
+                }
+                val charToInsert = dto.copy(isFavorite = local?.isFavorite ?: false).toCharacterEntity()
                 dao.insertCharacters(listOf(charToInsert))
                 ApiResult.Success(charToInsert.toStarWarsCharacter())
             }
@@ -99,23 +102,14 @@ class StarWarsRepository @Inject constructor(
         }
     }
 
-    private suspend fun getCharacterPhotoAndDescription(dto: StarWarsCharacterDto): StarWarsCharacterDto {
-        val databankInfo = getDatabankInfoByName(dto.name)
-        return dto.copy(
-            imageUrl = databankInfo?.image,
-            description = databankInfo?.description,
-        )
+    private suspend fun enrichWithDatabankInfo(dto: StarWarsCharacterDto): StarWarsCharacterDto {
+        val info = getDatabankInfoByName(dto.name)
+        return dto.copy(imageUrl = info?.image, description = info?.description)
     }
 
     private suspend fun getDatabankInfoByName(name: String): DatabankCharacterDto? {
-        val result = safeApiCall {
-            databankApi.getCharacterByName(name)
-        }
-        return if (result is ApiResult.Success) {
-            result.data.firstOrNull()
-        } else {
-            null
-        }
+        val result = safeApiCall { databankApi.getCharacterByName(name) }
+        return (result as? ApiResult.Success)?.data?.firstOrNull()
     }
 
     suspend fun toggleFavorite(id: String) {
@@ -127,137 +121,84 @@ class StarWarsRepository @Inject constructor(
     }
 
     fun getCharactersFlow(): Flow<List<StarWarsCharacter>> {
-        return dao.getCharacters().map { entities ->
-            entities.map { it.toStarWarsCharacter() }
-        }
+        return dao.getCharacters().map { entities -> entities.map { it.toStarWarsCharacter() } }
     }
 
     fun getFavoriteCharacters(): Flow<List<StarWarsCharacter>> {
-        return dao.getFavoriteCharacters().map { entities ->
-            entities.map { it.toStarWarsCharacter() }
-        }
+        return dao.getFavoriteCharacters().map { entities -> entities.map { it.toStarWarsCharacter() } }
     }
 
     suspend fun getPlanet(id: String): ApiResult<Planet> {
-        val result = safeApiCall {
-            api.getPlanet(id)
-        }
+        val result = safeApiCall { api.getPlanet(id) }
         return when (result) {
             is ApiResult.Success -> {
                 dao.insertPlanet(result.data.toPlanetEntity())
                 ApiResult.Success(result.data.toPlanet())
             }
-
             is ApiResult.Error -> {
                 val local = dao.getPlanetById(id)
-                if (local != null) {
-                    ApiResult.Success(local.toPlanet())
-                } else {
-                    result
-                }
+                if (local != null) ApiResult.Success(local.toPlanet()) else result
             }
         }
     }
 
     suspend fun getFilm(id: String): ApiResult<Film> {
-        val result = safeApiCall {
-            api.getFilm(id)
-        }
+        val result = safeApiCall { api.getFilm(id) }
         return when (result) {
             is ApiResult.Success -> {
                 dao.insertFilm(result.data.toFilmEntity())
                 ApiResult.Success(result.data.toFilm())
             }
-
             is ApiResult.Error -> {
                 val local = dao.getFilmById(id)
-                if (local != null) {
-                    ApiResult.Success(local.toFilm())
-                } else {
-                    result
-                }
+                if (local != null) ApiResult.Success(local.toFilm()) else result
             }
         }
     }
 
     suspend fun getStarship(id: String): ApiResult<Starship> {
-        val result = safeApiCall {
-            api.getStarship(id)
-        }
+        val result = safeApiCall { api.getStarship(id) }
         return when (result) {
             is ApiResult.Success -> {
                 dao.insertStarship(result.data.toStarshipEntity())
                 ApiResult.Success(result.data.toStarship())
             }
-
             is ApiResult.Error -> {
                 val local = dao.getStarshipById(id)
-                if (local != null) {
-                    ApiResult.Success(local.toStarship())
-                } else {
-                    result
-                }
+                if (local != null) ApiResult.Success(local.toStarship()) else result
             }
         }
     }
 
     suspend fun getVehicle(id: String): ApiResult<Vehicle> {
-        val result = safeApiCall {
-            api.getVehicle(id)
-        }
+        val result = safeApiCall { api.getVehicle(id) }
         return when (result) {
             is ApiResult.Success -> {
                 dao.insertVehicle(result.data.toVehicleEntity())
                 ApiResult.Success(result.data.toVehicle())
             }
-
             is ApiResult.Error -> {
                 val local = dao.getVehicleById(id)
-                if (local != null) {
-                    ApiResult.Success(local.toVehicle())
-                } else {
-                    result
-                }
+                if (local != null) ApiResult.Success(local.toVehicle()) else result
             }
         }
     }
 
     suspend fun syncAllData(): Boolean = coroutineScope {
         val charactersResult = getCharacters()
+        if (charactersResult !is ApiResult.Success) return@coroutineScope false
 
-        if (charactersResult is ApiResult.Success) {
+        val characters = charactersResult.data
+        val planetJobs = characters.map { it.homeworld.filter(Char::isDigit) }.distinct()
+            .map { id -> async { getPlanet(id) } }
+        val filmJobs = characters.flatMap { it.filmUrls }.map { it.filter(Char::isDigit) }.distinct()
+            .map { id -> async { getFilm(id) } }
+        val starshipJobs = characters.flatMap { it.starshipUrls }.map { it.filter(Char::isDigit) }.distinct()
+            .map { id -> async { getStarship(id) } }
+        val vehicleJobs = characters.flatMap { it.vehicleUrls }.map { it.filter(Char::isDigit) }.distinct()
+            .map { id -> async { getVehicle(id) } }
 
-            val characters = charactersResult.data
-            // Sync Planets (Homeworlds)
-            val planetIds = characters.map { it.homeworld.filter { c -> c.isDigit() } }.distinct()
-            val planetJobs = planetIds.map { id -> async { getPlanet(id) } }
-
-            // Sync Films
-            val filmIds =
-                characters.flatMap { it.filmUrls }.map { it.filter { c -> c.isDigit() } }.distinct()
-            val filmJobs = filmIds.map { id -> async { getFilm(id) } }
-
-            // Sync Starships
-            val starshipIds =
-                characters.flatMap { it.starshipUrls }.map { it.filter { c -> c.isDigit() } }
-                    .distinct()
-            val starshipJobs = starshipIds.map { id -> async { getStarship(id) } }
-
-            // Sync Vehicles
-            val vehicleIds =
-                characters.flatMap { it.vehicleUrls }.map { it.filter { c -> c.isDigit() } }
-                    .distinct()
-            val vehicleJobs = vehicleIds.map { id -> async { getVehicle(id) } }
-
-            awaitAll(
-                *planetJobs.toTypedArray(),
-                *filmJobs.toTypedArray(),
-                *starshipJobs.toTypedArray(),
-                *vehicleJobs.toTypedArray(),
-            )
-            true
-        } else {
-            false
-        }
+        awaitAll(*planetJobs.toTypedArray(), *filmJobs.toTypedArray(), *starshipJobs.toTypedArray(), *vehicleJobs.toTypedArray())
+        true
     }
 }

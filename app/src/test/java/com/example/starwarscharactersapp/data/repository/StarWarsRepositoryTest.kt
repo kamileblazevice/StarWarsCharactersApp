@@ -33,11 +33,11 @@ class StarWarsRepositoryTest {
     }
 
     @Test
-    fun `getCharacters returns success from API and saves to Dao`() = runTest {
+    fun `getCharacters fetches from Databank and saves to DAO when no cache exists`() = runTest {
         // Arrange
         val characterDto = StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
         val databankDto = DatabankCharacterDto(name = "Luke Skywalker", image = "image_url", description = "desc")
-        
+
         coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
         coEvery { databankApi.getCharacterByName("Luke Skywalker") } returns Response.success(listOf(databankDto))
         every { dao.getCharacters() } returns flowOf(emptyList())
@@ -51,8 +51,25 @@ class StarWarsRepositoryTest {
         assertEquals(1, characters.size)
         assertEquals("Luke Skywalker", characters[0].name)
         assertEquals("image_url", characters[0].imageUrl)
-        
         coVerify { dao.insertCharacters(any()) }
+    }
+
+    @Test
+    fun `getCharacters skips Databank API when imageUrl is already cached`() = runTest {
+        // Arrange
+        val characterDto = StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
+        val cachedEntity = createCharacterEntity(id = "1").copy(imageUrl = "cached_url", description = "cached_desc")
+
+        coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
+        every { dao.getCharacters() } returns flowOf(listOf(cachedEntity))
+
+        // Act
+        val result = repository.getCharacters()
+
+        // Assert
+        assertTrue(result is ApiResult.Success)
+        assertEquals("cached_url", (result as ApiResult.Success).data[0].imageUrl)
+        coVerify(exactly = 0) { databankApi.getCharacterByName(any()) }
     }
 
     @Test
@@ -70,7 +87,6 @@ class StarWarsRepositoryTest {
         val data = (result as ApiResult.Success).data
         assertEquals(1, data.size)
         assertEquals("Luke Skywalker", data[0].name)
-
         coVerify { api.getCharacters() }
         verify { dao.getCharacters() }
         coVerify(exactly = 0) { databankApi.getCharacterByName(any()) }
@@ -104,6 +120,6 @@ class StarWarsRepositoryTest {
         skinColor = "fair",
         filmUrls = emptyList(),
         starshipUrls = emptyList(),
-        vehicleUrls = emptyList()
+        vehicleUrls = emptyList(),
     )
 }
