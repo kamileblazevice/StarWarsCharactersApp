@@ -12,7 +12,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +25,7 @@ import androidx.core.view.WindowCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.starwarscharactersapp.R
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.starwarscharactersapp.ui.theme.StarWarsCharactersAppTheme
 import com.example.starwarscharactersapp.ui.theme.StarWarsYellow
 import kotlinx.coroutines.delay
@@ -35,7 +35,7 @@ fun SplashScreen(
     viewModel: SplashViewModel = hiltViewModel(),
     onDataLoaded: () -> Unit,
 ) {
-    val isDataLoaded by viewModel.isDataLoaded.collectAsState()
+    val isDataLoaded by viewModel.isDataLoaded.collectAsStateWithLifecycle()
 
     LaunchedEffect(isDataLoaded) {
         if (isDataLoaded) {
