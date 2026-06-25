@@ -37,7 +37,7 @@ class CharacterListViewModel @Inject constructor(
 
     init {
         observeCharacters()
-        refreshCharacters()
+        loadInitialData()
         observeNetwork()
     }
 
@@ -57,13 +57,27 @@ class CharacterListViewModel @Inject constructor(
         }
     }
 
-    private fun refreshCharacters() {
+    private fun loadInitialData() {
         viewModelScope.launch {
-            _state.value = UiState.Loading
-            val result = repository.getCharacters()
-            if (result is ApiResult.Error && _state.value is UiState.Loading) {
-                _state.value = UiState.Error(result.message)
+            when (val result = repository.getCharacters()) {
+                is ApiResult.Success -> {
+                    if (_state.value is UiState.Loading)
+                        _state.value = UiState.Success(result.data.sortedBy { it.name })
+                }
+                is ApiResult.Error -> {
+                    if (_state.value !is UiState.Success)
+                        _state.value = UiState.Error(result.message)
+                }
             }
+        }
+    }
+
+    private fun reloadFromNetwork() {
+        viewModelScope.launch {
+            if (_state.value !is UiState.Success) _state.value = UiState.Loading
+            val result = repository.refreshCharactersFromNetwork()
+            if (result is ApiResult.Error && _state.value !is UiState.Success)
+                _state.value = UiState.Error(result.message)
         }
     }
 
@@ -71,10 +85,9 @@ class CharacterListViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.isOnline.collect {
                 if (_state.value is UiState.Error) {
-                    refreshCharacters()
+                    reloadFromNetwork()
                 } else {
                     _imageReloadRevision.update { it + 1 }
-                    launch { repository.getCharacters() }
                 }
             }
         }
@@ -83,7 +96,7 @@ class CharacterListViewModel @Inject constructor(
     override fun onEvent(event: CharacterListEvent) {
         when (event) {
             is CharacterListEvent.OnSearchQueryChanged -> changeSearchQuery(event.query)
-            CharacterListEvent.OnReloadData -> refreshCharacters()
+            CharacterListEvent.OnReloadData -> reloadFromNetwork()
             is CharacterListEvent.OnToggleFavorite -> toggleFavorite(event.characterId)
         }
     }

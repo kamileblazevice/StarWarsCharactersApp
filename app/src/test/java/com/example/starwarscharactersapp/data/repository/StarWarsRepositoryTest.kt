@@ -11,7 +11,6 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -32,8 +31,28 @@ class StarWarsRepositoryTest {
         repository = StarWarsRepository(api, databankApi, dao)
     }
 
+    // getCharacters() — offline-first behaviour
+
     @Test
-    fun `getCharacters fetches from Databank and saves to DAO when no cache exists`() = runTest {
+    fun `getCharacters returns local data immediately without API call when cache is not empty`() = runTest {
+        // Arrange
+        val localCharacter = createCharacterEntity(id = "1", name = "Luke Skywalker")
+        every { dao.getCharacters() } returns flowOf(listOf(localCharacter))
+
+        // Act
+        val result = repository.getCharacters()
+
+        // Assert
+        assertTrue(result is ApiResult.Success)
+        val data = (result as ApiResult.Success).data
+        assertEquals(1, data.size)
+        assertEquals("Luke Skywalker", data[0].name)
+        coVerify(exactly = 0) { api.getCharacters() }
+        coVerify(exactly = 0) { databankApi.getCharacterByName(any()) }
+    }
+
+    @Test
+    fun `getCharacters fetches from network and saves to DB when cache is empty`() = runTest {
         // Arrange
         val characterDto = StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
         val databankDto = DatabankCharacterDto(name = "Luke Skywalker", image = "image_url", description = "desc")
@@ -56,7 +75,7 @@ class StarWarsRepositoryTest {
 
     @Test
     fun `getCharacters skips Databank API when imageUrl is already cached`() = runTest {
-        // Arrange
+        // Arrange — DB has a character with a cached imageUrl; network is configured but must not be called
         val characterDto = StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
         val cachedEntity = createCharacterEntity(id = "1").copy(imageUrl = "cached_url", description = "cached_desc")
 
@@ -66,40 +85,57 @@ class StarWarsRepositoryTest {
         // Act
         val result = repository.getCharacters()
 
-        // Assert
+        // Assert — returns DB data immediately; neither SWAPI nor Databank are called
         assertTrue(result is ApiResult.Success)
         assertEquals("cached_url", (result as ApiResult.Success).data[0].imageUrl)
+        coVerify(exactly = 0) { api.getCharacters() }
         coVerify(exactly = 0) { databankApi.getCharacterByName(any()) }
     }
 
     @Test
-    fun `getCharacters returns local data when API fails`() = runTest {
-        // Arrange
-        val localCharacter = createCharacterEntity(id = "1", name = "Luke Skywalker")
-        coEvery { api.getCharacters() } throws Exception("Network error")
-        every { dao.getCharacters() } returns flowOf(listOf(localCharacter))
-
-        // Act
-        val result = repository.getCharacters()
-
-        // Assert
-        assertTrue(result is ApiResult.Success)
-        val data = (result as ApiResult.Success).data
-        assertEquals(1, data.size)
-        assertEquals("Luke Skywalker", data[0].name)
-        coVerify { api.getCharacters() }
-        verify { dao.getCharacters() }
-        coVerify(exactly = 0) { databankApi.getCharacterByName(any()) }
-    }
-
-    @Test
-    fun `getCharacters returns error when API fails and local data is empty`() = runTest {
+    fun `getCharacters returns error when network fails and DB is empty`() = runTest {
         // Arrange
         coEvery { api.getCharacters() } throws Exception("Network error")
         every { dao.getCharacters() } returns flowOf(emptyList())
 
         // Act
         val result = repository.getCharacters()
+
+        // Assert
+        assertTrue(result is ApiResult.Error)
+        assertTrue((result as ApiResult.Error).message.contains("Network error"))
+    }
+
+    // refreshCharactersFromNetwork() — always hits the network
+
+    @Test
+    fun `refreshCharactersFromNetwork always calls network even when cache is not empty`() = runTest {
+        // Arrange
+        val characterDto = StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
+        val cachedEntity = createCharacterEntity(id = "1").copy(imageUrl = "cached_url", description = "cached_desc")
+        val databankDto = DatabankCharacterDto(name = "Luke Skywalker", image = "cached_url", description = "cached_desc")
+
+        coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
+        coEvery { databankApi.getCharacterByName(any()) } returns Response.success(listOf(databankDto))
+        every { dao.getCharacters() } returns flowOf(listOf(cachedEntity))
+
+        // Act
+        val result = repository.refreshCharactersFromNetwork()
+
+        // Assert
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) { api.getCharacters() }
+        coVerify { dao.insertCharacters(any()) }
+    }
+
+    @Test
+    fun `refreshCharactersFromNetwork returns error when network fails`() = runTest {
+        // Arrange
+        coEvery { api.getCharacters() } throws Exception("Network error")
+        every { dao.getCharacters() } returns flowOf(emptyList())
+
+        // Act
+        val result = repository.refreshCharactersFromNetwork()
 
         // Assert
         assertTrue(result is ApiResult.Error)
