@@ -1,7 +1,6 @@
 package com.example.starwarscharactersapp.ui.features.list
 
 import androidx.lifecycle.viewModelScope
-import com.example.starwarscharactersapp.data.helper.ApiResult
 import com.example.starwarscharactersapp.data.helper.NetworkMonitor
 import com.example.starwarscharactersapp.data.repository.StarWarsRepository
 import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
@@ -59,15 +58,13 @@ class CharacterListViewModel @Inject constructor(
 
     private fun loadInitialData() {
         viewModelScope.launch {
-            when (val result = repository.getCharacters()) {
-                is ApiResult.Success -> {
-                    if (_state.value is UiState.Loading)
-                        _state.value = UiState.Success(result.data.sortedBy { it.name })
-                }
-                is ApiResult.Error -> {
-                    if (_state.value !is UiState.Success)
-                        _state.value = UiState.Error(result.message)
-                }
+            val characters = repository.getCharacters()
+            if (characters != null) {
+                if (_state.value is UiState.Loading)
+                    _state.value = UiState.Success(characters.sortedBy { it.name })
+            } else {
+                if (_state.value !is UiState.Success)
+                    _state.value = UiState.Error("Failed to load characters")
             }
         }
     }
@@ -75,9 +72,9 @@ class CharacterListViewModel @Inject constructor(
     private fun reloadFromNetwork() {
         viewModelScope.launch {
             if (_state.value !is UiState.Success) _state.value = UiState.Loading
-            val result = repository.refreshCharactersFromNetwork()
-            if (result is ApiResult.Error && _state.value !is UiState.Success)
-                _state.value = UiState.Error(result.message)
+            val characters = repository.refreshCharactersFromNetwork()
+            if (characters == null && _state.value !is UiState.Success)
+                _state.value = UiState.Error("Failed to load characters")
         }
     }
 

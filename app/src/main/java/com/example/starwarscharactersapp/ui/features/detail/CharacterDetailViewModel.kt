@@ -1,7 +1,6 @@
 package com.example.starwarscharactersapp.ui.features.detail
 
 import androidx.lifecycle.viewModelScope
-import com.example.starwarscharactersapp.data.helper.ApiResult
 import com.example.starwarscharactersapp.data.helper.NetworkMonitor
 import com.example.starwarscharactersapp.data.repository.StarWarsRepository
 import com.example.starwarscharactersapp.ui.features.detail.model.CharacterDetailEvent
@@ -44,16 +43,15 @@ class CharacterDetailViewModel @AssistedInject constructor(
     private fun loadCharacter() {
         viewModelScope.launch {
             _state.value = UiState.Loading
-            when (val result = repository.getCharacter(characterId)) {
-                is ApiResult.Success -> {
-                    val character = result.data
-                    _state.value = UiState.Success(CharacterDetailUiState(character = character))
-                    if (character.homeworld.isNotEmpty()) loadPlanet(character.homeworld)
-                    if (character.filmUrls.isNotEmpty()) loadFilms(character.filmUrls)
-                    if (character.starshipUrls.isNotEmpty()) loadStarships(character.starshipUrls)
-                    if (character.vehicleUrls.isNotEmpty()) loadVehicles(character.vehicleUrls)
-                }
-                is ApiResult.Error -> _state.value = UiState.Error(result.message)
+            val character = repository.getCharacter(characterId)
+            if (character != null) {
+                _state.value = UiState.Success(CharacterDetailUiState(character = character))
+                if (character.homeworld.isNotEmpty()) loadPlanet(character.homeworld)
+                if (character.filmUrls.isNotEmpty()) loadFilms(character.filmUrls)
+                if (character.starshipUrls.isNotEmpty()) loadStarships(character.starshipUrls)
+                if (character.vehicleUrls.isNotEmpty()) loadVehicles(character.vehicleUrls)
+            } else {
+                _state.value = UiState.Error("Failed to load character")
             }
         }
     }
@@ -97,13 +95,15 @@ class CharacterDetailViewModel @AssistedInject constructor(
         val id = url.filter { it.isDigit() }
         viewModelScope.launch {
             _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(planetError = false)) else it }
-            when (val result = repository.getPlanet(id)) {
-                is ApiResult.Success -> _state.update { currentState ->
-                    if (currentState is UiState.Success) {
-                        UiState.Success(currentState.data.copy(character = currentState.data.character.copy(planet = result.data)))
-                    } else currentState
+            val planet = repository.getPlanet(id)
+            if (planet != null) {
+                _state.update { currentState ->
+                    if (currentState is UiState.Success)
+                        UiState.Success(currentState.data.copy(character = currentState.data.character.copy(planet = planet)))
+                    else currentState
                 }
-                is ApiResult.Error -> _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(planetError = true)) else it }
+            } else {
+                _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(planetError = true)) else it }
             }
         }
     }
@@ -114,8 +114,8 @@ class CharacterDetailViewModel @AssistedInject constructor(
             val results = filmUrls.map { url ->
                 async { repository.getFilm(url.filter { c -> c.isDigit() }) }
             }.awaitAll()
-            val fetchedFilms = results.mapNotNull { (it as? ApiResult.Success)?.data }
-            val hasError = results.any { it is ApiResult.Error }
+            val fetchedFilms = results.filterNotNull()
+            val hasError = results.any { it == null }
             _state.update { currentState ->
                 if (currentState is UiState.Success) {
                     UiState.Success(
@@ -135,8 +135,8 @@ class CharacterDetailViewModel @AssistedInject constructor(
             val results = starshipUrls.map { url ->
                 async { repository.getStarship(url.filter { c -> c.isDigit() }) }
             }.awaitAll()
-            val fetchedStarships = results.mapNotNull { (it as? ApiResult.Success)?.data }
-            val hasError = results.any { it is ApiResult.Error }
+            val fetchedStarships = results.filterNotNull()
+            val hasError = results.any { it == null }
             _state.update { currentState ->
                 if (currentState is UiState.Success) {
                     UiState.Success(
@@ -156,8 +156,8 @@ class CharacterDetailViewModel @AssistedInject constructor(
             val results = vehicleUrls.map { url ->
                 async { repository.getVehicle(url.filter { c -> c.isDigit() }) }
             }.awaitAll()
-            val fetchedVehicles = results.mapNotNull { (it as? ApiResult.Success)?.data }
-            val hasError = results.any { it is ApiResult.Error }
+            val fetchedVehicles = results.filterNotNull()
+            val hasError = results.any { it == null }
             _state.update { currentState ->
                 if (currentState is UiState.Success) {
                     UiState.Success(
