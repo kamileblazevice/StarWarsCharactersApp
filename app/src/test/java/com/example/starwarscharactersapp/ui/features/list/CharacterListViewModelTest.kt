@@ -1,7 +1,6 @@
 package com.example.starwarscharactersapp.ui.features.list
 
 import app.cash.turbine.test
-import com.example.starwarscharactersapp.data.helper.ApiResult
 import com.example.starwarscharactersapp.data.helper.NetworkMonitor
 import com.example.starwarscharactersapp.data.repository.StarWarsRepository
 import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
@@ -36,7 +35,7 @@ class CharacterListViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { repository.getCharactersFlow() } returns flowOf(emptyList())
         every { networkMonitor.isOnline } returns flowOf(true)
-        coEvery { repository.getCharacters() } returns ApiResult.Success(emptyList())
+        coEvery { repository.getCharacters() } returns emptyList()
     }
 
     @After

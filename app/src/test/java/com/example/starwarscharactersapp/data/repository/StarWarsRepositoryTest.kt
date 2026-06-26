@@ -1,6 +1,5 @@
 package com.example.starwarscharactersapp.data.repository
 
-import com.example.starwarscharactersapp.data.helper.ApiResult
 import com.example.starwarscharactersapp.data.local.StarWarsDao
 import com.example.starwarscharactersapp.data.local.entity.CharacterEntity
 import com.example.starwarscharactersapp.data.model.DatabankCharacterDto
@@ -14,7 +13,8 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import retrofit2.Response
@@ -43,10 +43,9 @@ class StarWarsRepositoryTest {
         val result = repository.getCharacters()
 
         // Assert
-        assertTrue(result is ApiResult.Success)
-        val data = (result as ApiResult.Success).data
-        assertEquals(1, data.size)
-        assertEquals("Luke Skywalker", data[0].name)
+        assertNotNull(result)
+        assertEquals(1, result!!.size)
+        assertEquals("Luke Skywalker", result[0].name)
         coVerify(exactly = 0) { api.getCharacters() }
         coVerify(exactly = 0) { databankApi.getCharacterByName(any()) }
     }
@@ -65,11 +64,10 @@ class StarWarsRepositoryTest {
         val result = repository.getCharacters()
 
         // Assert
-        assertTrue(result is ApiResult.Success)
-        val characters = (result as ApiResult.Success).data
-        assertEquals(1, characters.size)
-        assertEquals("Luke Skywalker", characters[0].name)
-        assertEquals("image_url", characters[0].imageUrl)
+        assertNotNull(result)
+        assertEquals(1, result!!.size)
+        assertEquals("Luke Skywalker", result[0].name)
+        assertEquals("image_url", result[0].imageUrl)
         coVerify { dao.insertCharacters(any()) }
     }
 
@@ -86,8 +84,8 @@ class StarWarsRepositoryTest {
         val result = repository.getCharacters()
 
         // Assert — returns DB data immediately; neither SWAPI nor Databank are called
-        assertTrue(result is ApiResult.Success)
-        assertEquals("cached_url", (result as ApiResult.Success).data[0].imageUrl)
+        assertNotNull(result)
+        assertEquals("cached_url", result!![0].imageUrl)
         coVerify(exactly = 0) { api.getCharacters() }
         coVerify(exactly = 0) { databankApi.getCharacterByName(any()) }
     }
@@ -102,8 +100,7 @@ class StarWarsRepositoryTest {
         val result = repository.getCharacters()
 
         // Assert
-        assertTrue(result is ApiResult.Error)
-        assertTrue((result as ApiResult.Error).message.contains("Network error"))
+        assertNull(result)
     }
 
     // refreshCharactersFromNetwork() — always hits the network
@@ -123,7 +120,7 @@ class StarWarsRepositoryTest {
         val result = repository.refreshCharactersFromNetwork()
 
         // Assert
-        assertTrue(result is ApiResult.Success)
+        assertNotNull(result)
         coVerify(exactly = 1) { api.getCharacters() }
         coVerify { dao.insertCharacters(any()) }
     }
@@ -138,8 +135,7 @@ class StarWarsRepositoryTest {
         val result = repository.refreshCharactersFromNetwork()
 
         // Assert
-        assertTrue(result is ApiResult.Error)
-        assertTrue((result as ApiResult.Error).message.contains("Network error"))
+        assertNull(result)
     }
 
     private fun createCharacterEntity(id: String = "1", name: String = "Luke Skywalker") = CharacterEntity(

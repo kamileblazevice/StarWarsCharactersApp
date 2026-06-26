@@ -1,7 +1,6 @@
 package com.example.starwarscharactersapp.ui.features.detail
 
 import app.cash.turbine.test
-import com.example.starwarscharactersapp.data.helper.ApiResult
 import com.example.starwarscharactersapp.data.helper.NetworkMonitor
 import com.example.starwarscharactersapp.data.repository.StarWarsRepository
 import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
@@ -48,7 +47,7 @@ class CharacterDetailViewModelTest {
     fun `initial state is Loading and then Success`() = runTest {
         // Arrange
         val character = StarWarsCharacter(id = characterId, name = "Luke Skywalker")
-        coEvery { repository.getCharacter(characterId) } returns ApiResult.Success(character)
+        coEvery { repository.getCharacter(characterId) } returns character
 
         // Act
         viewModel = CharacterDetailViewModel(repository, networkMonitor, characterId)
@@ -65,7 +64,7 @@ class CharacterDetailViewModelTest {
     @Test
     fun `state is Error when API fails and no local data`() = runTest {
         // Arrange
-        coEvery { repository.getCharacter(characterId) } returns ApiResult.Error("Network error")
+        coEvery { repository.getCharacter(characterId) } returns null
 
         // Act
         viewModel = CharacterDetailViewModel(repository, networkMonitor, characterId)
