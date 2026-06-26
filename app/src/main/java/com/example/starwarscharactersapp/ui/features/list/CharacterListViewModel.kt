@@ -9,6 +9,7 @@ import com.example.starwarscharactersapp.ui.helper.BaseViewModel
 import com.example.starwarscharactersapp.ui.helper.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,6 +65,7 @@ class CharacterListViewModel @Inject constructor(
                     _state.value = UiState.Success(characters.sortedBy { it.name })
             } else {
                 if (_state.value !is UiState.Success)
+                    delay(1000)
                     _state.value = UiState.Error("Failed to load characters")
             }
         }
@@ -74,6 +76,7 @@ class CharacterListViewModel @Inject constructor(
             if (_state.value !is UiState.Success) _state.value = UiState.Loading
             val characters = repository.refreshCharactersFromNetwork()
             if (characters == null && _state.value !is UiState.Success)
+                delay(1000)
                 _state.value = UiState.Error("Failed to load characters")
         }
     }
