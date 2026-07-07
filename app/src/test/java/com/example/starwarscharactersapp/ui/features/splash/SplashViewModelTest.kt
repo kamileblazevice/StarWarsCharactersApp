@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.example.starwarscharactersapp.data.local.PrefsManager
 import com.example.starwarscharactersapp.data.repository.StarWarsRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -49,5 +50,40 @@ class SplashViewModelTest {
             assertEquals(false, awaitItem())
             assertEquals(true, awaitItem())
         }
+        coVerify { repository.syncAllData() }
+        coVerify { prefsManager.updateSyncTimestamp(any()) }
+    }
+
+    @Test
+    fun `sync is skipped when last sync was recent`() = runTest {
+        // Arrange
+        every { prefsManager.lastSyncTimestamp } returns flowOf(System.currentTimeMillis())
+
+        // Act
+        viewModel = SplashViewModel(repository, prefsManager)
+
+        // Assert
+        viewModel.isDataLoaded.test {
+            assertEquals(false, awaitItem())
+            assertEquals(true, awaitItem())
+        }
+        coVerify(exactly = 0) { repository.syncAllData() }
+        coVerify(exactly = 0) { prefsManager.updateSyncTimestamp(any()) }
+    }
+
+    @Test
+    fun `sync timestamp is not updated when syncAllData fails`() = runTest {
+        // Arrange
+        coEvery { repository.syncAllData() } returns false
+
+        // Act
+        viewModel = SplashViewModel(repository, prefsManager)
+
+        // Assert
+        viewModel.isDataLoaded.test {
+            assertEquals(false, awaitItem())
+            assertEquals(true, awaitItem())
+        }
+        coVerify(exactly = 0) { prefsManager.updateSyncTimestamp(any()) }
     }
 }
