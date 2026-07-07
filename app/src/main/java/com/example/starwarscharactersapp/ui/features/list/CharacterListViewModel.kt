@@ -1,5 +1,6 @@
 package com.example.starwarscharactersapp.ui.features.list
 
+import android.annotation.SuppressLint
 import androidx.lifecycle.viewModelScope
 import com.example.starwarscharactersapp.data.helper.NetworkMonitor
 import com.example.starwarscharactersapp.data.repository.StarWarsRepository
@@ -57,6 +58,7 @@ class CharacterListViewModel @Inject constructor(
         }
     }
 
+    @SuppressLint("SuspiciousIndentation")
     private fun loadInitialData() {
         viewModelScope.launch {
             val characters = repository.getCharacters()
@@ -64,9 +66,10 @@ class CharacterListViewModel @Inject constructor(
                 if (_state.value is UiState.Loading)
                     _state.value = UiState.Success(characters.sortedBy { it.name })
             } else {
-                if (_state.value !is UiState.Success)
+                if (_state.value !is UiState.Success) {
                     delay(1000)
                     _state.value = UiState.Error("Failed to load characters")
+                }
             }
         }
     }
@@ -75,9 +78,10 @@ class CharacterListViewModel @Inject constructor(
         viewModelScope.launch {
             if (_state.value !is UiState.Success) _state.value = UiState.Loading
             val characters = repository.refreshCharactersFromNetwork()
-            if (characters == null && _state.value !is UiState.Success)
+            if (characters == null && _state.value !is UiState.Success) {
                 delay(1000)
                 _state.value = UiState.Error("Failed to load characters")
+            }
         }
     }
 
