@@ -8,8 +8,6 @@ import kotlinx.serialization.Serializable
 data class StarWarsCharacterDto(
     @SerializedName("birth_year")
     val birthYear: String = "",
-    val created: String = "",
-    val edited: String = "",
     @SerializedName("eye_color")
     val eyeColor: String = "",
     @SerializedName("films")
