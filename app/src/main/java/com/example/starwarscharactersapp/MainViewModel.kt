@@ -15,10 +15,10 @@ class MainViewModel @Inject constructor(
     prefsManager: PrefsManager,
 ) : ViewModel() {
 
-    val themeMode: StateFlow<ThemeMode> = prefsManager.themeMode
+    val themeMode: StateFlow<ThemeMode?> = prefsManager.themeMode
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
-            ThemeMode.SYSTEM,
+            null,
         )
 }

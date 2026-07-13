@@ -40,6 +40,7 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun StarWarsCharactersAppTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    isSplashVisible: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = when (themeMode) {
@@ -57,9 +58,12 @@ fun StarWarsCharactersAppTheme(
         SideEffect {
             val window = (view.context as android.app.Activity).window
             val insetsController = WindowCompat.getInsetsController(window, view)
-
-            insetsController.isAppearanceLightStatusBars = !darkTheme
-            insetsController.isAppearanceLightNavigationBars = !darkTheme
+            // Splash always renders on a black background regardless of theme,
+            // so it needs light status/nav bar icons even in Light mode.
+            // This must be recomputed here whenever isSplashVisible flips
+            val useLightIcons = isSplashVisible || darkTheme
+            insetsController.isAppearanceLightStatusBars = !useLightIcons
+            insetsController.isAppearanceLightNavigationBars = !useLightIcons
         }
     }
 

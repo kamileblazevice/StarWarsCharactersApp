@@ -11,17 +11,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.example.starwarscharactersapp.R
 import androidx.compose.ui.tooling.preview.Preview
@@ -41,16 +38,6 @@ fun SplashScreen(
         if (isDataLoaded) {
             delay(2000)
             onDataLoaded()
-        }
-    }
-
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as android.app.Activity).window
-            val insetsController = WindowCompat.getInsetsController(window, view)
-            insetsController.isAppearanceLightStatusBars = false
-            insetsController.isAppearanceLightNavigationBars = false
         }
     }
 

@@ -38,10 +38,11 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `themeMode defaults to SYSTEM and reflects prefsManager updates`() = runTest {
+    fun `themeMode defaults to null while loading then reflects prefsManager updates`() = runTest {
         viewModel = MainViewModel(prefsManager)
 
         viewModel.themeMode.test {
+            assertEquals(null, awaitItem())
             assertEquals(ThemeMode.SYSTEM, awaitItem())
 
             themeModeFlow.value = ThemeMode.LIGHT
