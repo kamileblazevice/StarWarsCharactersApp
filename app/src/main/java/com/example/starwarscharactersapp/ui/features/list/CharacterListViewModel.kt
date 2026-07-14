@@ -45,7 +45,7 @@ class CharacterListViewModel @Inject constructor(
     private fun observeCharacters() {
         viewModelScope.launch {
             repository.getCharactersFlow()
-                .combine(_searchQuery.debounce(300)) { characters, query ->
+                .combine(_searchQuery.debounce { query -> if (query.isEmpty()) 0L else 300L }) { characters, query ->
                     val filtered = if (query.isEmpty()) characters
                     else characters.filter { it.name.contains(query, ignoreCase = true) }
                     filtered.sortedBy { it.name }
