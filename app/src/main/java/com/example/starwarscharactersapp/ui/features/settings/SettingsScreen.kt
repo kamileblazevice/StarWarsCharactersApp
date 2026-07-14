@@ -48,6 +48,7 @@ fun SettingsContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(padding)
                 .padding(dimensionResource(R.dimen.margin_medium)),
         ) {
             Text(

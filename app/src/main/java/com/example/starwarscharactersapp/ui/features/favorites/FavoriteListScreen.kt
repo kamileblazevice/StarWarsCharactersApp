@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -52,8 +53,12 @@ fun FavoriteListContent(
     onCharacterClicked: (String) -> Unit,
     onEvent: (FavoriteListEvent) -> Unit,
 ) {
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { _ ->
-        Box(modifier = Modifier.fillMaxSize()) {
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
             when (state) {
                 UiState.Loading -> LoadingView()
                 is UiState.Error -> { /* Favorites are local-only; errors cannot happen here */ }

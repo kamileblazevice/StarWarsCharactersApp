@@ -1,5 +1,6 @@
 package com.example.starwarscharactersapp.navigation
 
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -42,7 +43,8 @@ fun NavigationRoot(
         NavDisplay(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding),
             onBack = navigator::goBack,
             sceneStrategies = listOf(TwoPaneSceneStrategy(adaptiveInfo.windowSizeClass)),
             entries = navigationState.toEntries(
