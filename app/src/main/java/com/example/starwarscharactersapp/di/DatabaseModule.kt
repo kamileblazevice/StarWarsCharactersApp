@@ -32,7 +32,7 @@ object DatabaseModule {
             context,
             StarWarsDatabase::class.java,
             StarWarsDatabase.DATABASE_NAME,
-        ).fallbackToDestructiveMigration(dropAllTables = true).build()
+        ).fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true).build()
 
     @Provides
     @Singleton

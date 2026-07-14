@@ -18,7 +18,7 @@ import com.example.starwarscharactersapp.data.local.entity.VehicleEntity
         VehicleEntity::class,
     ],
     version = 1,
-    exportSchema = false,
+    exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class StarWarsDatabase : RoomDatabase() {
