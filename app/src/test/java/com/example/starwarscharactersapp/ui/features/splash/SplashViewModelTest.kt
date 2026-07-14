@@ -2,7 +2,7 @@ package com.example.starwarscharactersapp.ui.features.splash
 
 import app.cash.turbine.test
 import com.example.starwarscharactersapp.data.local.PrefsManager
-import com.example.starwarscharactersapp.data.repository.StarWarsRepository
+import com.example.starwarscharactersapp.domain.StarWarsRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every

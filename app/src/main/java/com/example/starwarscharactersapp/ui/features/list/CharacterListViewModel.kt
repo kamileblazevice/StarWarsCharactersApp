@@ -3,7 +3,7 @@ package com.example.starwarscharactersapp.ui.features.list
 import android.annotation.SuppressLint
 import androidx.lifecycle.viewModelScope
 import com.example.starwarscharactersapp.data.helper.NetworkMonitor
-import com.example.starwarscharactersapp.data.repository.StarWarsRepository
+import com.example.starwarscharactersapp.domain.StarWarsRepository
 import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
 import com.example.starwarscharactersapp.ui.features.list.model.CharacterListEvent
 import com.example.starwarscharactersapp.ui.helper.BaseViewModel

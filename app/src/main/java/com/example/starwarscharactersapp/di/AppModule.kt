@@ -11,7 +11,6 @@ import com.example.starwarscharactersapp.data.local.StarWarsDao
 import com.example.starwarscharactersapp.data.local.StarWarsDatabase
 import com.example.starwarscharactersapp.data.network.DatabankApiService
 import com.example.starwarscharactersapp.data.network.SwapiApiService
-import com.example.starwarscharactersapp.data.repository.StarWarsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -68,18 +67,4 @@ object AppModule {
     @Singleton
     fun provideNetworkMonitor(@ApplicationContext context: Context): NetworkMonitor =
         NetworkMonitor(context)
-
-    @Provides
-    @Singleton
-    fun provideRepository(
-        api: SwapiApiService,
-        databankApi: DatabankApiService,
-        dao: StarWarsDao,
-    ): StarWarsRepository =
-        StarWarsRepository(
-            api,
-            databankApi,
-            dao,
-        )
-
 }

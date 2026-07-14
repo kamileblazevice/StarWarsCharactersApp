@@ -21,6 +21,7 @@ import com.example.starwarscharactersapp.data.model.toVehicle
 import com.example.starwarscharactersapp.data.model.toVehicleEntity
 import com.example.starwarscharactersapp.data.network.DatabankApiService
 import com.example.starwarscharactersapp.data.network.SwapiApiService
+import com.example.starwarscharactersapp.domain.StarWarsRepository
 import com.example.starwarscharactersapp.domain.model.Film
 import com.example.starwarscharactersapp.domain.model.Planet
 import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
@@ -34,14 +35,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
-class StarWarsRepository @Inject constructor(
+class StarWarsRepositoryImpl @Inject constructor(
     private val api: SwapiApiService,
     private val databankApi: DatabankApiService,
     private val dao: StarWarsDao,
-) {
+) : StarWarsRepository {
     private fun <T> ApiResult<T>.getOrNull(): T? = (this as? ApiResult.Success)?.data
 
-    suspend fun getCharacters(): List<StarWarsCharacter>? {
+    override suspend fun getCharacters(): List<StarWarsCharacter>? {
         val local = dao.getCharacters().first()
         return if (local.isNotEmpty())
             local.map { it.toStarWarsCharacter() }
@@ -49,7 +50,7 @@ class StarWarsRepository @Inject constructor(
             fetchAndCacheCharacters()
     }
 
-    suspend fun refreshCharactersFromNetwork(): List<StarWarsCharacter>? =
+    override suspend fun refreshCharactersFromNetwork(): List<StarWarsCharacter>? =
         fetchAndCacheCharacters()
 
     private suspend fun fetchAndCacheCharacters(): List<StarWarsCharacter>? = coroutineScope {
@@ -77,7 +78,7 @@ class StarWarsRepository @Inject constructor(
         }
     }
 
-    suspend fun getCharacter(id: String): StarWarsCharacter? {
+    override suspend fun getCharacter(id: String): StarWarsCharacter? {
         val local = dao.getCharacterById(id)
         if (local != null) return local.toStarWarsCharacter()
 
@@ -97,23 +98,23 @@ class StarWarsRepository @Inject constructor(
     private suspend fun getDatabankInfoByName(name: String): DatabankCharacterDto? =
         safeApiCall { databankApi.getCharacterByName(name) }.getOrNull()?.firstOrNull()
 
-    suspend fun toggleFavorite(id: String) {
+    override suspend fun toggleFavorite(id: String) {
         dao.toggleFavoriteStatus(id)
     }
 
-    fun getCharacterFlow(id: String): Flow<StarWarsCharacter?> {
+    override fun getCharacterFlow(id: String): Flow<StarWarsCharacter?> {
         return dao.getCharacterFlowById(id).map { it?.toStarWarsCharacter() }
     }
 
-    fun getCharactersFlow(): Flow<List<StarWarsCharacter>> {
+    override fun getCharactersFlow(): Flow<List<StarWarsCharacter>> {
         return dao.getCharacters().map { entities -> entities.map { it.toStarWarsCharacter() } }
     }
 
-    fun getFavoriteCharacters(): Flow<List<StarWarsCharacter>> {
+    override fun getFavoriteCharacters(): Flow<List<StarWarsCharacter>> {
         return dao.getFavoriteCharacters().map { entities -> entities.map { it.toStarWarsCharacter() } }
     }
 
-    suspend fun getPlanet(id: String): Planet? {
+    override suspend fun getPlanet(id: String): Planet? {
         val local = dao.getPlanetById(id)
         if (local != null) return local.toPlanet()
 
@@ -123,7 +124,7 @@ class StarWarsRepository @Inject constructor(
         }
     }
 
-    suspend fun getFilm(id: String): Film? {
+    override suspend fun getFilm(id: String): Film? {
         val local = dao.getFilmById(id)
         if (local != null) return local.toFilm()
 
@@ -133,7 +134,7 @@ class StarWarsRepository @Inject constructor(
         }
     }
 
-    suspend fun getStarship(id: String): Starship? {
+    override suspend fun getStarship(id: String): Starship? {
         val local = dao.getStarshipById(id)
         if (local != null) return local.toStarship()
 
@@ -143,7 +144,7 @@ class StarWarsRepository @Inject constructor(
         }
     }
 
-    suspend fun getVehicle(id: String): Vehicle? {
+    override suspend fun getVehicle(id: String): Vehicle? {
         val local = dao.getVehicleById(id)
         if (local != null) return local.toVehicle()
 
@@ -153,7 +154,7 @@ class StarWarsRepository @Inject constructor(
         }
     }
 
-    suspend fun syncAllData(): Boolean = coroutineScope {
+    override suspend fun syncAllData(): Boolean = coroutineScope {
         val characters = refreshCharactersFromNetwork() ?: return@coroutineScope false
 
         val planetJobs = characters.map { it.homeworld.filter(Char::isDigit) }.distinct()

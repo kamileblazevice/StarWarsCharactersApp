@@ -30,16 +30,16 @@ import org.junit.Before
 import org.junit.Test
 import retrofit2.Response
 
-class StarWarsRepositoryTest {
+class StarWarsRepositoryImplTest {
 
     private val api = mockk<SwapiApiService>()
     private val databankApi = mockk<DatabankApiService>()
     private val dao = mockk<StarWarsDao>(relaxed = true)
-    private lateinit var repository: StarWarsRepository
+    private lateinit var repository: StarWarsRepositoryImpl
 
     @Before
     fun setup() {
-        repository = StarWarsRepository(api, databankApi, dao)
+        repository = StarWarsRepositoryImpl(api, databankApi, dao)
     }
 
     @Test

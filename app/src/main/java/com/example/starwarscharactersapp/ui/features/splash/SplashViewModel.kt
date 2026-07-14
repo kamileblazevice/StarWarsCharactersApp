@@ -3,7 +3,7 @@ package com.example.starwarscharactersapp.ui.features.splash
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.starwarscharactersapp.data.local.PrefsManager
-import com.example.starwarscharactersapp.data.repository.StarWarsRepository
+import com.example.starwarscharactersapp.domain.StarWarsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow

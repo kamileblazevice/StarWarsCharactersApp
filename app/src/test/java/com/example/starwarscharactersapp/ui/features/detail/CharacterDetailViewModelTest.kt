@@ -2,7 +2,7 @@ package com.example.starwarscharactersapp.ui.features.detail
 
 import app.cash.turbine.test
 import com.example.starwarscharactersapp.data.helper.NetworkMonitor
-import com.example.starwarscharactersapp.data.repository.StarWarsRepository
+import com.example.starwarscharactersapp.domain.StarWarsRepository
 import com.example.starwarscharactersapp.domain.model.Film
 import com.example.starwarscharactersapp.domain.model.Planet
 import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
