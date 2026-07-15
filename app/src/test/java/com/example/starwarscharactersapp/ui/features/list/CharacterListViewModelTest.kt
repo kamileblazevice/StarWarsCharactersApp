@@ -166,7 +166,7 @@ class CharacterListViewModelTest {
     }
 
     @Test
-    fun `imageReloadRevision increments on network status changes while not in Error state`() = runTest {
+    fun `imageReloadRevision increments only when network comes back online while not in Error state`() = runTest {
         coEvery { repository.getCharacters() } returns emptyList()
         every { networkMonitor.isOnline } returns flowOf(true, false, true)
 
@@ -176,7 +176,6 @@ class CharacterListViewModelTest {
             assertEquals(0, awaitItem())
             assertEquals(1, awaitItem())
             assertEquals(2, awaitItem())
-            assertEquals(3, awaitItem())
         }
     }
 }

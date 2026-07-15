@@ -89,7 +89,7 @@ class FavoriteListViewModelTest {
     }
 
     @Test
-    fun `imageReloadRevision increments on every network status emission`() = runTest {
+    fun `imageReloadRevision increments only when network comes back online`() = runTest {
         every { repository.getFavoriteCharacters() } returns flowOf(emptyList())
         every { networkMonitor.isOnline } returns flowOf(true, false, true)
 
@@ -99,7 +99,6 @@ class FavoriteListViewModelTest {
             assertEquals(0, awaitItem())
             assertEquals(1, awaitItem())
             assertEquals(2, awaitItem())
-            assertEquals(3, awaitItem())
         }
     }
 }

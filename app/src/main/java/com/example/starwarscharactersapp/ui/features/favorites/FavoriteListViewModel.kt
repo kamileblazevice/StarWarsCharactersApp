@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -42,7 +43,7 @@ class FavoriteListViewModel @Inject constructor(
 
     private fun observeNetwork() {
         viewModelScope.launch {
-            networkMonitor.isOnline.collect {
+            networkMonitor.isOnline.filter { it }.collect {
                 _imageReloadRevision.update { it + 1 }
             }
         }
