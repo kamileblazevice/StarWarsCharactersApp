@@ -54,6 +54,7 @@ class CharacterDetailViewModelTest {
     fun `initial state is Loading and then Success`() = runTest {
         val character = createStarWarsCharacter()
         coEvery { repository.getCharacter("1") } returns character
+        every { repository.getCharacterFlow("1") } returns flowOf(character)
 
         viewModel = CharacterDetailViewModel(repository, networkMonitor, "1")
 
@@ -87,6 +88,7 @@ class CharacterDetailViewModelTest {
             vehicleUrls = listOf("https://swapi.dev/api/vehicles/14/"),
             )
         coEvery { repository.getCharacter("1") } returns character
+        every { repository.getCharacterFlow("1") } returns flowOf(character)
         coEvery { repository.getPlanet("1") } returns Planet(id = "1", name = "Tatooine")
         coEvery { repository.getFilm("1") } returns Film(id = "1", title = "A New Hope")
         coEvery { repository.getStarship("12") } returns Starship(id = "12", name = "X-wing")
@@ -110,6 +112,7 @@ class CharacterDetailViewModelTest {
     fun `planetError is set when the planet fetch fails`() = runTest {
         val character = createStarWarsCharacter().copy(homeworld = "https://swapi.dev/api/planets/1/")
         coEvery { repository.getCharacter("1") } returns character
+        every { repository.getCharacterFlow("1") } returns flowOf(character)
         coEvery { repository.getPlanet("1") } returns null
 
         viewModel = CharacterDetailViewModel(repository, networkMonitor, "1")
@@ -129,6 +132,7 @@ class CharacterDetailViewModelTest {
             )
         )
         coEvery { repository.getCharacter("1") } returns character
+        every { repository.getCharacterFlow("1") } returns flowOf(character)
         coEvery { repository.getFilm("1") } returns Film(id = "1", title = "A New Hope")
         coEvery { repository.getFilm("2") } returns null
 
@@ -144,6 +148,7 @@ class CharacterDetailViewModelTest {
     fun `filmsError is set when every film fetch fails`() = runTest {
         val character = createStarWarsCharacter().copy(filmUrls = listOf("https://swapi.dev/api/films/1/"))
         coEvery { repository.getCharacter("1") } returns character
+        every { repository.getCharacterFlow("1") } returns flowOf(character)
         coEvery { repository.getFilm("1") } returns null
 
         viewModel = CharacterDetailViewModel(repository, networkMonitor, "1")
@@ -186,6 +191,7 @@ class CharacterDetailViewModelTest {
     fun `OnRetryPlanet reloads the planet after a failure`() = runTest {
         val character = createStarWarsCharacter().copy(homeworld = "https://swapi.dev/api/planets/1/")
         coEvery { repository.getCharacter("1") } returns character
+        every { repository.getCharacterFlow("1") } returns flowOf(character)
         coEvery { repository.getPlanet("1") } returns null
         viewModel = CharacterDetailViewModel(repository, networkMonitor, "1")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -207,6 +213,7 @@ class CharacterDetailViewModelTest {
             filmUrls = listOf("https://swapi.dev/api/films/1/"),
         )
         coEvery { repository.getCharacter("1") } returns character
+        every { repository.getCharacterFlow("1") } returns flowOf(character)
         coEvery { repository.getPlanet("1") } returns null
         coEvery { repository.getFilm("1") } returns null
         val isOnlineFlow = MutableSharedFlow<Boolean>(replay = 1)
@@ -232,11 +239,16 @@ class CharacterDetailViewModelTest {
     @Test
     fun `OnReloadData event allows recovery from an Error state`() = runTest {
         coEvery { repository.getCharacter("1") } returns null
+        val characterFlow = MutableSharedFlow<StarWarsCharacter?>(replay = 1)
+        every { repository.getCharacterFlow("1") } returns characterFlow
         viewModel = CharacterDetailViewModel(repository, networkMonitor, "1")
         testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(viewModel.state.value is UiState.Error)
 
-        coEvery { repository.getCharacter("1") } returns StarWarsCharacter(id = "1", name = "Luke Skywalker")
+        val character = StarWarsCharacter(id = "1", name = "Luke Skywalker")
+        coEvery { repository.getCharacter("1") } returns character
         viewModel.onEvent(CharacterDetailEvent.OnReloadData)
+        characterFlow.emit(character)
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.state.value

@@ -34,6 +34,8 @@ class CharacterDetailViewModel @AssistedInject constructor(
     private val _state = MutableStateFlow<UiState<CharacterDetailUiState>>(UiState.Loading)
     val state = _state.asStateFlow()
 
+    private var relatedDataRequested = false
+
     init {
         loadCharacter()
         observeCharacter()
@@ -44,13 +46,7 @@ class CharacterDetailViewModel @AssistedInject constructor(
         viewModelScope.launch {
             _state.value = UiState.Loading
             val character = repository.getCharacter(characterId)
-            if (character != null) {
-                _state.value = UiState.Success(CharacterDetailUiState(character = character))
-                if (character.homeworld.isNotEmpty()) loadPlanet(character.homeworld)
-                if (character.filmUrls.isNotEmpty()) loadFilms(character.filmUrls)
-                if (character.starshipUrls.isNotEmpty()) loadStarships(character.starshipUrls)
-                if (character.vehicleUrls.isNotEmpty()) loadVehicles(character.vehicleUrls)
-            } else {
+            if (character == null) {
                 delayBeforeShowingError()
                 _state.value = UiState.Error("Failed to load character")
             }
@@ -60,12 +56,26 @@ class CharacterDetailViewModel @AssistedInject constructor(
     private fun observeCharacter() {
         viewModelScope.launch {
             repository.getCharacterFlow(characterId).collect { character ->
-                character?.let {
-                    _state.update { currentState ->
-                        if (currentState is UiState.Success) {
-                            UiState.Success(currentState.data.copy(character = currentState.data.character.copy(isFavorite = it.isFavorite)))
-                        } else currentState
-                    }
+                character ?: return@collect
+                _state.update { currentState ->
+                    val previousData = (currentState as? UiState.Success)?.data
+                    val mergedCharacter = character.copy(
+                        films = previousData?.character?.films.orEmpty(),
+                        planet = previousData?.character?.planet,
+                        starships = previousData?.character?.starships.orEmpty(),
+                        vehicles = previousData?.character?.vehicles.orEmpty(),
+                    )
+                    UiState.Success(
+                        previousData?.copy(character = mergedCharacter)
+                            ?: CharacterDetailUiState(character = mergedCharacter)
+                    )
+                }
+                if (!relatedDataRequested) {
+                    relatedDataRequested = true
+                    if (character.homeworld.isNotEmpty()) loadPlanet(character.homeworld)
+                    if (character.filmUrls.isNotEmpty()) loadFilms(character.filmUrls)
+                    if (character.starshipUrls.isNotEmpty()) loadStarships(character.starshipUrls)
+                    if (character.vehicleUrls.isNotEmpty()) loadVehicles(character.vehicleUrls)
                 }
             }
         }
