@@ -1,5 +1,6 @@
 package com.example.starwarscharactersapp.data.repository
 
+import android.util.Log
 import com.example.starwarscharactersapp.data.helper.ApiResult
 import com.example.starwarscharactersapp.data.helper.safeApiCall
 import com.example.starwarscharactersapp.data.local.StarWarsDao
@@ -35,12 +36,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
+private const val TAG = "StarWarsRepository"
+
 class StarWarsRepositoryImpl @Inject constructor(
     private val api: SwapiApiService,
     private val databankApi: DatabankApiService,
     private val dao: StarWarsDao,
 ) : StarWarsRepository {
-    private fun <T> ApiResult<T>.getOrNull(): T? = (this as? ApiResult.Success)?.data
+    private fun <T> ApiResult<T>.getOrNull(): T? = when (this) {
+        is ApiResult.Success -> data
+        is ApiResult.Error -> {
+            Log.e(TAG, message, throwable)
+            null
+        }
+    }
 
     override suspend fun getCharacters(): List<StarWarsCharacter>? {
         val local = dao.getCharacters().first()
