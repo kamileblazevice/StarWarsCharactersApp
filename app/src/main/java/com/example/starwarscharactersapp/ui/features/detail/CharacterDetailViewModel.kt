@@ -13,7 +13,6 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
@@ -52,7 +51,7 @@ class CharacterDetailViewModel @AssistedInject constructor(
                 if (character.starshipUrls.isNotEmpty()) loadStarships(character.starshipUrls)
                 if (character.vehicleUrls.isNotEmpty()) loadVehicles(character.vehicleUrls)
             } else {
-                delay(1000)
+                delayBeforeShowingError()
                 _state.value = UiState.Error("Failed to load character")
             }
         }
@@ -105,7 +104,7 @@ class CharacterDetailViewModel @AssistedInject constructor(
                     else currentState
                 }
             } else {
-                delay(1000)
+                delayBeforeShowingError()
                 _state.update { if (it is UiState.Success) UiState.Success(it.data.copy(planetError = true)) else it }
             }
         }
@@ -119,7 +118,7 @@ class CharacterDetailViewModel @AssistedInject constructor(
             }.awaitAll()
             val fetchedFilms = results.filterNotNull()
             val hasError = results.any { it == null }
-            if(hasError) delay(1000)
+            if (hasError) delayBeforeShowingError()
             _state.update { currentState ->
                 if (currentState is UiState.Success) {
                     UiState.Success(
@@ -141,7 +140,7 @@ class CharacterDetailViewModel @AssistedInject constructor(
             }.awaitAll()
             val fetchedStarships = results.filterNotNull()
             val hasError = results.any { it == null }
-            if(hasError) delay(1000)
+            if (hasError) delayBeforeShowingError()
             _state.update { currentState ->
                 if (currentState is UiState.Success) {
                     UiState.Success(
@@ -163,7 +162,7 @@ class CharacterDetailViewModel @AssistedInject constructor(
             }.awaitAll()
             val fetchedVehicles = results.filterNotNull()
             val hasError = results.any { it == null }
-            if(hasError) delay(1000)
+            if (hasError) delayBeforeShowingError()
             _state.update { currentState ->
                 if (currentState is UiState.Success) {
                     UiState.Success(
