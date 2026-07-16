@@ -4,6 +4,7 @@ import com.example.starwarscharactersapp.domain.model.Film
 import com.example.starwarscharactersapp.domain.model.Planet
 import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
 import com.example.starwarscharactersapp.domain.model.Starship
+import com.example.starwarscharactersapp.domain.model.SyncProgress
 import com.example.starwarscharactersapp.domain.model.Vehicle
 import kotlinx.coroutines.flow.Flow
 
@@ -19,5 +20,5 @@ interface StarWarsRepository {
     suspend fun getFilm(id: String): Film?
     suspend fun getStarship(id: String): Starship?
     suspend fun getVehicle(id: String): Vehicle?
-    suspend fun syncAllData(): Boolean
+    fun syncAllData(): Flow<SyncProgress>
 }

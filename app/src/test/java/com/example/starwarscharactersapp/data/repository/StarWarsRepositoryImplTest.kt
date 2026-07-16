@@ -1,5 +1,6 @@
 package com.example.starwarscharactersapp.data.repository
 
+import app.cash.turbine.test
 import com.example.starwarscharactersapp.data.local.StarWarsDao
 import com.example.starwarscharactersapp.data.local.entity.CharacterEntity
 import com.example.starwarscharactersapp.data.local.entity.FilmEntity
@@ -14,10 +15,12 @@ import com.example.starwarscharactersapp.data.model.StarshipDto
 import com.example.starwarscharactersapp.data.model.VehicleDto
 import com.example.starwarscharactersapp.data.network.DatabankApiService
 import com.example.starwarscharactersapp.data.network.SwapiApiService
+import com.example.starwarscharactersapp.domain.model.SyncProgress
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -29,6 +32,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import retrofit2.Response
+import java.util.concurrent.atomic.AtomicInteger
 
 class StarWarsRepositoryImplTest {
 
@@ -43,25 +47,32 @@ class StarWarsRepositoryImplTest {
     }
 
     @Test
-    fun `getCharacters returns local data immediately without API call when cache is not empty`() = runTest {
-        val localCharacter = createCharacterEntity()
-        every { dao.getCharacters() } returns flowOf(listOf(localCharacter))
+    fun `getCharacters returns local data immediately without API call when cache is not empty`() =
+        runTest {
+            val localCharacter = createCharacterEntity()
+            every { dao.getCharacters() } returns flowOf(listOf(localCharacter))
 
-        val result = repository.getCharacters()
+            val result = repository.getCharacters()
 
-        assertNotNull(result)
-        assertEquals(1, result!!.size)
-        assertEquals("Luke Skywalker", result[0].name)
-        coVerify(exactly = 0) { api.getCharacters() }
-        coVerify(exactly = 0) { databankApi.getCharacterByName(any()) }
-    }
+            assertNotNull(result)
+            assertEquals(1, result!!.size)
+            assertEquals("Luke Skywalker", result[0].name)
+            coVerify(exactly = 0) { api.getCharacters() }
+            coVerify(exactly = 0) { databankApi.getCharacterByName(any()) }
+        }
 
     @Test
     fun `getCharacters fetches from network and saves to DB when cache is empty`() = runTest {
-        val characterDto = StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
-        val databankDto = DatabankCharacterDto(name = "Luke Skywalker", image = "image_url", description = "desc")
+        val characterDto =
+            StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
+        val databankDto =
+            DatabankCharacterDto(name = "Luke Skywalker", image = "image_url", description = "desc")
         coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
-        coEvery { databankApi.getCharacterByName("Luke Skywalker") } returns Response.success(listOf(databankDto))
+        coEvery { databankApi.getCharacterByName("Luke Skywalker") } returns Response.success(
+            listOf(
+                databankDto
+            )
+        )
         every { dao.getCharacters() } returns flowOf(emptyList())
 
         val result = repository.getCharacters()
@@ -75,8 +86,10 @@ class StarWarsRepositoryImplTest {
 
     @Test
     fun `getCharacters skips Databank API when imageUrl is already cached`() = runTest {
-        val characterDto = StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
-        val cachedEntity = createCharacterEntity().copy(imageUrl = "cached_url", description = "cached_desc")
+        val characterDto =
+            StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
+        val cachedEntity =
+            createCharacterEntity().copy(imageUrl = "cached_url", description = "cached_desc")
         coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
         every { dao.getCharacters() } returns flowOf(listOf(cachedEntity))
 
@@ -99,20 +112,33 @@ class StarWarsRepositoryImplTest {
     }
 
     @Test
-    fun `refreshCharactersFromNetwork always calls network even when cache is not empty`() = runTest {
-        val characterDto = StarWarsCharacterDto(name = "Luke Skywalker", url = "https://swapi.dev/api/people/1/")
-        val cachedEntity = createCharacterEntity().copy(imageUrl = "cached_url", description = "cached_desc")
-        val databankDto = DatabankCharacterDto(name = "Luke Skywalker", image = "cached_url", description = "cached_desc")
-        coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
-        coEvery { databankApi.getCharacterByName(any()) } returns Response.success(listOf(databankDto))
-        every { dao.getCharacters() } returns flowOf(listOf(cachedEntity))
+    fun `refreshCharactersFromNetwork always calls network even when cache is not empty`() =
+        runTest {
+            val characterDto = StarWarsCharacterDto(
+                name = "Luke Skywalker",
+                url = "https://swapi.dev/api/people/1/"
+            )
+            val cachedEntity =
+                createCharacterEntity().copy(imageUrl = "cached_url", description = "cached_desc")
+            val databankDto = DatabankCharacterDto(
+                name = "Luke Skywalker",
+                image = "cached_url",
+                description = "cached_desc"
+            )
+            coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
+            coEvery { databankApi.getCharacterByName(any()) } returns Response.success(
+                listOf(
+                    databankDto
+                )
+            )
+            every { dao.getCharacters() } returns flowOf(listOf(cachedEntity))
 
-        val result = repository.refreshCharactersFromNetwork()
+            val result = repository.refreshCharactersFromNetwork()
 
-        assertNotNull(result)
-        coVerify(exactly = 1) { api.getCharacters() }
-        coVerify { dao.insertCharacters(any()) }
-    }
+            assertNotNull(result)
+            coVerify(exactly = 1) { api.getCharacters() }
+            coVerify { dao.insertCharacters(any()) }
+        }
 
     @Test
     fun `refreshCharactersFromNetwork returns null when network fails`() = runTest {
@@ -138,11 +164,17 @@ class StarWarsRepositoryImplTest {
 
     @Test
     fun `getCharacter fetches from network, enriches and caches when not local`() = runTest {
-        val characterDto = StarWarsCharacterDto(name = "Leia Organa", url = "https://swapi.dev/api/people/5/")
-        val databankDto = DatabankCharacterDto(name = "Leia Organa", image = "leia.png", description = "princess")
+        val characterDto =
+            StarWarsCharacterDto(name = "Leia Organa", url = "https://swapi.dev/api/people/5/")
+        val databankDto =
+            DatabankCharacterDto(name = "Leia Organa", image = "leia.png", description = "princess")
         coEvery { dao.getCharacterById("5") } returns null
         coEvery { api.getCharacter("5") } returns Response.success(characterDto)
-        coEvery { databankApi.getCharacterByName("Leia Organa") } returns Response.success(listOf(databankDto))
+        coEvery { databankApi.getCharacterByName("Leia Organa") } returns Response.success(
+            listOf(
+                databankDto
+            )
+        )
 
         val result = repository.getCharacter("5")
 
@@ -165,7 +197,8 @@ class StarWarsRepositoryImplTest {
 
     @Test
     fun `getCharacter leaves imageUrl null when Databank has no match`() = runTest {
-        val characterDto = StarWarsCharacterDto(name = "Unknown", url = "https://swapi.dev/api/people/7/")
+        val characterDto =
+            StarWarsCharacterDto(name = "Unknown", url = "https://swapi.dev/api/people/7/")
         coEvery { dao.getCharacterById("7") } returns null
         coEvery { api.getCharacter("7") } returns Response.success(characterDto)
         coEvery { databankApi.getCharacterByName("Unknown") } returns Response.success(emptyList())
@@ -195,7 +228,12 @@ class StarWarsRepositoryImplTest {
 
     @Test
     fun `getCharactersFlow maps dao flow list to domain models`() = runTest {
-        every { dao.getCharacters() } returns flowOf(listOf(createCharacterEntity(), createCharacterEntity(id = "2")))
+        every { dao.getCharacters() } returns flowOf(
+            listOf(
+                createCharacterEntity(),
+                createCharacterEntity(id = "2")
+            )
+        )
 
         val result = repository.getCharactersFlow().first()
 
@@ -342,44 +380,151 @@ class StarWarsRepositoryImplTest {
     }
 
     @Test
-    fun `syncAllData returns false when character refresh fails`() = runTest {
+    fun `syncAllData emits Failure when character refresh fails`() = runTest {
         coEvery { api.getCharacters() } throws Exception("Network error")
         every { dao.getCharacters() } returns flowOf(emptyList())
 
-        val result = repository.syncAllData()
-
-        assertFalse(result)
+        repository.syncAllData().test {
+            assertEquals(SyncProgress.Failure, awaitItem())
+            awaitComplete()
+        }
     }
 
     @Test
-    fun `syncAllData refreshes characters then fetches related planets, films, starships and vehicles`() = runTest {
-        val characterDto = StarWarsCharacterDto(
-            name = "Luke Skywalker",
-            url = "https://swapi.dev/api/people/1/",
-            homeworld = "https://swapi.dev/api/planets/1/",
-            filmUrls = listOf("https://swapi.dev/api/films/1/"),
-            starshipUrls = listOf("https://swapi.dev/api/starships/12/"),
-            vehicleUrls = listOf("https://swapi.dev/api/vehicles/14/"),
-        )
-        val databankDto = DatabankCharacterDto(name = "Luke Skywalker", image = "image_url", description = "desc")
-        coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
-        coEvery { databankApi.getCharacterByName(any()) } returns Response.success(listOf(databankDto))
+    fun `syncAllData refreshes characters then fetches related planets, films, starships and vehicles`() =
+        runTest {
+            val characterDto = StarWarsCharacterDto(
+                name = "Luke Skywalker",
+                url = "https://swapi.dev/api/people/1/",
+                homeworld = "https://swapi.dev/api/planets/1/",
+                filmUrls = listOf("https://swapi.dev/api/films/1/"),
+                starshipUrls = listOf("https://swapi.dev/api/starships/12/"),
+                vehicleUrls = listOf("https://swapi.dev/api/vehicles/14/"),
+            )
+            val databankDto = DatabankCharacterDto(
+                name = "Luke Skywalker",
+                image = "image_url",
+                description = "desc"
+            )
+            coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
+            coEvery { databankApi.getCharacterByName(any()) } returns Response.success(
+                listOf(
+                    databankDto
+                )
+            )
+            every { dao.getCharacters() } returns flowOf(emptyList())
+
+            coEvery { dao.getPlanetById("1") } returns null
+            coEvery { api.getPlanet("1") } returns Response.success(createPlanetDto())
+            coEvery { dao.getFilmById("1") } returns null
+            coEvery { api.getFilm("1") } returns Response.success(createFilmDto())
+            coEvery { dao.getStarshipById("12") } returns null
+            coEvery { api.getStarship("12") } returns Response.success(createStarshipDto())
+            coEvery { dao.getVehicleById("14") } returns null
+            coEvery { api.getVehicle("14") } returns Response.success(createVehicleDto())
+
+            val emissions = mutableListOf<SyncProgress>()
+            repository.syncAllData().test {
+                do {
+                    val item = awaitItem()
+                    emissions += item
+                } while (item != SyncProgress.Success)
+                awaitComplete()
+            }
+
+            val progressUpdates = emissions.filterIsInstance<SyncProgress.InProgress>()
+            assertEquals(setOf(1, 2, 3, 4), progressUpdates.map { it.completed }.toSet())
+            assertTrue(progressUpdates.all { it.total == 4 })
+            assertEquals(SyncProgress.Success, emissions.last())
+            coVerify { dao.insertPlanet(any()) }
+            coVerify { dao.insertFilm(any()) }
+            coVerify { dao.insertStarship(any()) }
+            coVerify { dao.insertVehicle(any()) }
+        }
+
+    @Test
+    fun `syncAllData emits Failure when a related-entity fetch fails, but still fetches the rest`() =
+        runTest {
+            val characterDto = StarWarsCharacterDto(
+                name = "Luke Skywalker",
+                url = "https://swapi.dev/api/people/1/",
+                homeworld = "https://swapi.dev/api/planets/1/",
+                filmUrls = listOf("https://swapi.dev/api/films/1/"),
+                starshipUrls = listOf("https://swapi.dev/api/starships/12/"),
+                vehicleUrls = listOf("https://swapi.dev/api/vehicles/14/"),
+            )
+            val databankDto = DatabankCharacterDto(
+                name = "Luke Skywalker",
+                image = "image_url",
+                description = "desc",
+            )
+            coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
+            coEvery { databankApi.getCharacterByName(any()) } returns Response.success(
+                listOf(
+                    databankDto
+                )
+            )
+            every { dao.getCharacters() } returns flowOf(emptyList())
+
+            coEvery { dao.getPlanetById("1") } returns null
+            coEvery { api.getPlanet("1") } throws Exception("Network error")
+            coEvery { dao.getFilmById("1") } returns null
+            coEvery { api.getFilm("1") } returns Response.success(createFilmDto())
+            coEvery { dao.getStarshipById("12") } returns null
+            coEvery { api.getStarship("12") } returns Response.success(createStarshipDto())
+            coEvery { dao.getVehicleById("14") } returns null
+            coEvery { api.getVehicle("14") } returns Response.success(createVehicleDto())
+
+            val emissions = mutableListOf<SyncProgress>()
+            repository.syncAllData().test {
+                do {
+                    val item = awaitItem()
+                    emissions += item
+                } while (item is SyncProgress.InProgress)
+                awaitComplete()
+            }
+
+            val progressUpdates = emissions.filterIsInstance<SyncProgress.InProgress>()
+            assertEquals(setOf(1, 2, 3, 4), progressUpdates.map { it.completed }.toSet())
+            assertEquals(SyncProgress.Failure, emissions.last())
+            coVerify(exactly = 0) { dao.insertPlanet(any()) }
+            coVerify { dao.insertFilm(any()) }
+            coVerify { dao.insertStarship(any()) }
+            coVerify { dao.insertVehicle(any()) }
+        }
+
+    @Test
+    fun `syncAllData never runs more than 5 related-entity fetches concurrently`() = runTest {
+        val characters = (1..20).map { i ->
+            StarWarsCharacterDto(
+                name = "Character $i",
+                url = "https://swapi.dev/api/people/$i/",
+                homeworld = "https://swapi.dev/api/planets/$i/",
+            )
+        }
+        coEvery { api.getCharacters() } returns Response.success(characters)
+        coEvery { databankApi.getCharacterByName(any()) } returns Response.success(emptyList())
         every { dao.getCharacters() } returns flowOf(emptyList())
 
-        coEvery { dao.getPlanetById("1") } returns null
-        coEvery { api.getPlanet("1") } returns Response.success(createPlanetDto())
-        coEvery { dao.getFilmById("1") } returns null
-        coEvery { api.getFilm("1") } returns Response.success(createFilmDto())
-        coEvery { dao.getStarshipById("12") } returns null
-        coEvery { api.getStarship("12") } returns Response.success(createStarshipDto())
-        coEvery { dao.getVehicleById("14") } returns null
-        coEvery { api.getVehicle("14") } returns Response.success(createVehicleDto())
+        val currentConcurrency = AtomicInteger(0)
+        val maxObservedConcurrency = AtomicInteger(0)
+        coEvery { dao.getPlanetById(any()) } coAnswers {
+            val current = currentConcurrency.incrementAndGet()
+            maxObservedConcurrency.updateAndGet { max -> maxOf(max, current) }
+            delay(10)
+            currentConcurrency.decrementAndGet()
+            null
+        }
+        coEvery { api.getPlanet(any()) } returns Response.success(createPlanetDto())
 
-        assertTrue(repository.syncAllData())
-        coVerify { dao.insertPlanet(any()) }
-        coVerify { dao.insertFilm(any()) }
-        coVerify { dao.insertStarship(any()) }
-        coVerify { dao.insertVehicle(any()) }
+        repository.syncAllData().test {
+            do {
+                val item = awaitItem()
+            } while (item != SyncProgress.Success)
+            awaitComplete()
+        }
+
+        assertTrue(maxObservedConcurrency.get() <= 5)
     }
 
     private fun createPlanetDto() = PlanetDto(
@@ -409,51 +554,52 @@ class StarWarsRepositoryImplTest {
         title = "A New Hope",
         director = "George Lucas",
         releaseYear = "1977",
-        )
+    )
 
     private fun createFilmDto() = FilmDto(
         title = "A New Hope",
         url = "https://swapi.dev/api/films/1/",
         director = "George Lucas",
         releaseDate = "1977-05-25",
-        )
+    )
 
     private fun createStarshipEntity() = StarshipEntity(
         id = "12",
         url = "url",
         name = "X-wing",
-        )
+    )
 
     private fun createStarshipDto() = StarshipDto(
         name = "X-wing",
         url = "https://swapi.dev/api/starships/12/",
-        )
+    )
 
     private fun createVehicleEntity() = VehicleEntity(
         id = "14",
         url = "url",
         name = "Snowspeeder",
-        )
+    )
 
     private fun createVehicleDto() = VehicleDto(
         name = "Snowspeeder",
         url = "https://swapi.dev/api/vehicles/14/",
     )
 
-    private fun createCharacterEntity(id: String = "1", name: String = "Luke Skywalker") = CharacterEntity(
-        id = id,
-        url = "https://swapi.dev/api/people/$id/",
-        name = name,
-        birthYear = "19BBY",
-        eyeColor = "blue",
-        gender = "male",
-        hairColor = "blond",
-        height = "172",
-        homeworld = "https://swapi.dev/api/planets/1/",
-        mass = "77",
-        skinColor = "fair",
-        filmUrls = emptyList(),
-        starshipUrls = emptyList(),
-        vehicleUrls = emptyList(),
-    )
+    private fun createCharacterEntity(id: String = "1", name: String = "Luke Skywalker") =
+        CharacterEntity(
+            id = id,
+            url = "https://swapi.dev/api/people/$id/",
+            name = name,
+            birthYear = "19BBY",
+            eyeColor = "blue",
+            gender = "male",
+            hairColor = "blond",
+            height = "172",
+            homeworld = "https://swapi.dev/api/planets/1/",
+            mass = "77",
+            skinColor = "fair",
+            filmUrls = emptyList(),
+            starshipUrls = emptyList(),
+            vehicleUrls = emptyList(),
+        )
 }

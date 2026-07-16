@@ -44,6 +44,7 @@
     <string name="bottom_nav_item_settings">Settings</string>
     <string name="favorite_icon_description">Favorite</string>
     <string name="splash_logo_description">Star Wars Logo</string>
+    <string name="splash_sync_progress">Syncing %1$d / %2$d</string>
     <string name="error_screen_text">An error occurred while loading data</string>
     <string name="error_screen_button_text">Retry</string>
 

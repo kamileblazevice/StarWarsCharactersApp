@@ -27,16 +27,24 @@ import com.example.starwarscharactersapp.domain.model.Film
 import com.example.starwarscharactersapp.domain.model.Planet
 import com.example.starwarscharactersapp.domain.model.StarWarsCharacter
 import com.example.starwarscharactersapp.domain.model.Starship
+import com.example.starwarscharactersapp.domain.model.SyncProgress
 import com.example.starwarscharactersapp.domain.model.Vehicle
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
 private const val TAG = "StarWarsRepository"
+// Matches OkHttp's default per-host concurrency cap (Dispatcher.maxRequestsPerHost = 5);
+private const val MAX_CONCURRENT_SYNC_REQUESTS = 5
 
 class StarWarsRepositoryImpl @Inject constructor(
     private val api: SwapiApiService,
@@ -163,19 +171,36 @@ class StarWarsRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun syncAllData(): Boolean = coroutineScope {
-        val characters = refreshCharactersFromNetwork() ?: return@coroutineScope false
+    override fun syncAllData(): Flow<SyncProgress> = channelFlow {
+        val characters = refreshCharactersFromNetwork()
+        if (characters == null) {
+            send(SyncProgress.Failure)
+            return@channelFlow
+        }
 
-        val planetJobs = characters.map { it.homeworld.filter(Char::isDigit) }.distinct()
-            .map { id -> async { getPlanet(id) } }
-        val filmJobs = characters.flatMap { it.filmUrls }.map { it.filter(Char::isDigit) }.distinct()
-            .map { id -> async { getFilm(id) } }
-        val starshipJobs = characters.flatMap { it.starshipUrls }.map { it.filter(Char::isDigit) }.distinct()
-            .map { id -> async { getStarship(id) } }
-        val vehicleJobs = characters.flatMap { it.vehicleUrls }.map { it.filter(Char::isDigit) }.distinct()
-            .map { id -> async { getVehicle(id) } }
+        val planetIds = characters.map { it.homeworld.filter(Char::isDigit) }.distinct()
+        val filmIds = characters.flatMap { it.filmUrls }.map { it.filter(Char::isDigit) }.distinct()
+        val starshipIds = characters.flatMap { it.starshipUrls }.map { it.filter(Char::isDigit) }.distinct()
+        val vehicleIds = characters.flatMap { it.vehicleUrls }.map { it.filter(Char::isDigit) }.distinct()
+        val total = planetIds.size + filmIds.size + starshipIds.size + vehicleIds.size
 
-        awaitAll(*planetJobs.toTypedArray(), *filmJobs.toTypedArray(), *starshipJobs.toTypedArray(), *vehicleJobs.toTypedArray())
-        true
+        val semaphore = Semaphore(MAX_CONCURRENT_SYNC_REQUESTS)
+        val completedCount = AtomicInteger(0)
+        val hasFailure = AtomicBoolean(false)
+
+        suspend fun <T> fetchAndReportProgress(id: String, fetch: suspend (String) -> T?) {
+            val result = semaphore.withPermit { fetch(id) }
+            if (result == null) hasFailure.set(true)
+            send(SyncProgress.InProgress(completedCount.incrementAndGet(), total))
+        }
+
+        val jobs =
+            planetIds.map { id -> async { fetchAndReportProgress(id, ::getPlanet) } } +
+                filmIds.map { id -> async { fetchAndReportProgress(id, ::getFilm) } } +
+                starshipIds.map { id -> async { fetchAndReportProgress(id, ::getStarship) } } +
+                vehicleIds.map { id -> async { fetchAndReportProgress(id, ::getVehicle) } }
+
+        jobs.awaitAll()
+        send(if (hasFailure.get()) SyncProgress.Failure else SyncProgress.Success)
     }
 }
