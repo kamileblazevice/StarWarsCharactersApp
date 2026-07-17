@@ -391,6 +391,17 @@ class StarWarsRepositoryImplTest {
     }
 
     @Test
+    fun `syncAllData emits Failure when character refresh returns an empty list`() = runTest {
+        coEvery { api.getCharacters() } returns Response.success(emptyList())
+        every { dao.getCharacters() } returns flowOf(emptyList())
+
+        repository.syncAllData().test {
+            assertEquals(SyncProgress.Failure, awaitItem())
+            awaitComplete()
+        }
+    }
+
+    @Test
     fun `syncAllData refreshes characters then fetches related planets, films, starships and vehicles`() =
         runTest {
             val characterDto = StarWarsCharacterDto(

@@ -173,7 +173,7 @@ class StarWarsRepositoryImpl @Inject constructor(
 
     override fun syncAllData(): Flow<SyncProgress> = channelFlow {
         val characters = refreshCharactersFromNetwork()
-        if (characters == null) {
+        if (characters.isNullOrEmpty()) {
             send(SyncProgress.Failure)
             return@channelFlow
         }
