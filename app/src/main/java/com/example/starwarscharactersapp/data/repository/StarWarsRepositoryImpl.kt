@@ -178,10 +178,14 @@ class StarWarsRepositoryImpl @Inject constructor(
             return@channelFlow
         }
 
-        val planetIds = characters.map { it.homeworld.filter(Char::isDigit) }.distinct()
-        val filmIds = characters.flatMap { it.filmUrls }.map { it.filter(Char::isDigit) }.distinct()
-        val starshipIds = characters.flatMap { it.starshipUrls }.map { it.filter(Char::isDigit) }.distinct()
-        val vehicleIds = characters.flatMap { it.vehicleUrls }.map { it.filter(Char::isDigit) }.distinct()
+        val planetIds = characters.map { it.homeworld.filter(Char::isDigit) }
+            .filter(String::isNotBlank).distinct()
+        val filmIds = characters.flatMap { it.filmUrls }.map { it.filter(Char::isDigit) }
+            .filter(String::isNotBlank).distinct()
+        val starshipIds = characters.flatMap { it.starshipUrls }.map { it.filter(Char::isDigit) }
+            .filter(String::isNotBlank).distinct()
+        val vehicleIds = characters.flatMap { it.vehicleUrls }.map { it.filter(Char::isDigit) }
+            .filter(String::isNotBlank).distinct()
         val total = planetIds.size + filmIds.size + starshipIds.size + vehicleIds.size
 
         val semaphore = Semaphore(MAX_CONCURRENT_SYNC_REQUESTS)

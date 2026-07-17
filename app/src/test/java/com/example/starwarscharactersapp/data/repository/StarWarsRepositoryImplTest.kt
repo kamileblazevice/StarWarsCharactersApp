@@ -402,6 +402,44 @@ class StarWarsRepositoryImplTest {
     }
 
     @Test
+    fun `syncAllData skips related-entity fetches when the extracted id is blank`() = runTest {
+        val characterDto = StarWarsCharacterDto(
+            name = "Luke Skywalker",
+            url = "https://swapi.dev/api/people/1/",
+            homeworld = "https://swapi.dev/api/planets/unknown/",
+            filmUrls = listOf("https://swapi.dev/api/films/1/"),
+            starshipUrls = emptyList(),
+            vehicleUrls = emptyList(),
+        )
+        val databankDto = DatabankCharacterDto(
+            name = "Luke Skywalker",
+            image = "image_url",
+            description = "desc",
+        )
+        coEvery { api.getCharacters() } returns Response.success(listOf(characterDto))
+        coEvery { databankApi.getCharacterByName(any()) } returns Response.success(listOf(databankDto))
+        every { dao.getCharacters() } returns flowOf(emptyList())
+
+        coEvery { dao.getFilmById("1") } returns null
+        coEvery { api.getFilm("1") } returns Response.success(createFilmDto())
+
+        val emissions = mutableListOf<SyncProgress>()
+        repository.syncAllData().test {
+            do {
+                val item = awaitItem()
+                emissions += item
+            } while (item != SyncProgress.Success)
+            awaitComplete()
+        }
+
+        val progressUpdates = emissions.filterIsInstance<SyncProgress.InProgress>()
+        assertTrue(progressUpdates.all { it.total == 1 })
+        assertEquals(SyncProgress.Success, emissions.last())
+        coVerify(exactly = 0) { api.getPlanet(any()) }
+        coVerify { dao.insertFilm(any()) }
+    }
+
+    @Test
     fun `syncAllData refreshes characters then fetches related planets, films, starships and vehicles`() =
         runTest {
             val characterDto = StarWarsCharacterDto(
