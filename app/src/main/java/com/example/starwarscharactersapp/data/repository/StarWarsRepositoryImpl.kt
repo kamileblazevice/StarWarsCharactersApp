@@ -81,7 +81,7 @@ class StarWarsRepositoryImpl @Inject constructor(
                     if (cached?.imageUrl != null) {
                         dto.copy(imageUrl = cached.imageUrl, description = cached.description)
                     } else {
-                        enrichWithDatabankInfo(dto)
+                        Semaphore(MAX_CONCURRENT_SYNC_REQUESTS).withPermit { enrichWithDatabankInfo(dto) }
                     }
                 }
             }.awaitAll()
