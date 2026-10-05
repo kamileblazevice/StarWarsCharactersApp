@@ -1,10 +1,8 @@
 package com.example.starwarscharactersapp.ui.features.settings
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.starwarscharactersapp.data.local.PrefsManager
 import com.example.starwarscharactersapp.data.local.ThemeMode
-import com.example.starwarscharactersapp.ui.features.list.model.CharacterListEvent
 import com.example.starwarscharactersapp.ui.features.settings.model.SettingsEvent
 import com.example.starwarscharactersapp.ui.helper.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
