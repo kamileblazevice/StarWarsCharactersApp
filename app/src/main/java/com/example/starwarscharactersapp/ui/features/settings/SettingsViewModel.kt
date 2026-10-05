@@ -20,8 +20,6 @@ class SettingsViewModel @Inject constructor(
     val themeMode: StateFlow<ThemeMode> = prefsManager.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeMode.SYSTEM)
 
-
-
     override fun onEvent(event: SettingsEvent) {
         when (event) {
             is SettingsEvent.OnUpdateThemeMode -> updateThemeMode(mode = event.mode)
