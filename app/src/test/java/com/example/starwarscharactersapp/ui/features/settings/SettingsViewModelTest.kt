@@ -3,6 +3,7 @@ package com.example.starwarscharactersapp.ui.features.settings
 import app.cash.turbine.test
 import com.example.starwarscharactersapp.data.local.PrefsManager
 import com.example.starwarscharactersapp.data.local.ThemeMode
+import com.example.starwarscharactersapp.ui.features.settings.model.SettingsEvent
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -53,10 +54,10 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `setThemeMode calls prefsManager update`() = runTest {
+    fun `OnUpdateThemeMode calls prefsManager update`() = runTest {
         // Act
         viewModel = SettingsViewModel(prefsManager)
-        viewModel.setThemeMode(ThemeMode.LIGHT)
+        viewModel.onEvent(SettingsEvent.OnUpdateThemeMode(ThemeMode.LIGHT))
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert

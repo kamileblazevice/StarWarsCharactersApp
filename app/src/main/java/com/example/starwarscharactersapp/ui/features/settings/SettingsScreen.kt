@@ -25,6 +25,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.starwarscharactersapp.R
 import com.example.starwarscharactersapp.data.local.ThemeMode
+import com.example.starwarscharactersapp.ui.features.settings.model.SettingsEvent
 import com.example.starwarscharactersapp.ui.theme.StarWarsCharactersAppTheme
 
 @Composable
@@ -35,7 +36,7 @@ fun SettingsScreen(
 
     SettingsContent(
         themeMode = themeMode,
-        onThemeModeSelected = { viewModel.setThemeMode(it) },
+        onThemeModeSelected = { viewModel.onEvent(SettingsEvent.OnUpdateThemeMode(it)) },
     )
 }
 
